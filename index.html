@@ -1,0 +1,2769 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор менюборда</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+    :root {
+        --primary: #04C9B0;
+        --primary-hover: #139483;
+        --primary-active: #4DAB9E;
+        --primary-light: rgba(4, 201, 176, 0.1);
+        --text-main: #FFFFFF;
+        --text-secondary: #b2b2b2;
+        --border: #333333;
+        --background-light: #191C1F;
+        --background-dark: #090909;
+        --background-sidebar: #121416;
+        --border-radius: 8px;
+        --btn-radius: 20px;
+        --transition-medium: 0.3s;
+        
+        --grid-bg-color: transparent;
+        --cell-bg-color: transparent;
+        --menu-bg-color: #007568;
+        
+        --sidebar-width: 76px;
+        --settings-panel-width: 360px;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    [contenteditable] { outline: 2px solid transparent; transition: outline-color 0.2s; padding: 2px 4px; border-radius: 4px; }
+    [contenteditable]:focus, [contenteditable]:hover { outline-color: var(--primary); background: rgba(0,0,0,0.5); box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+    
+    body { font-family: 'Inter', sans-serif; color: var(--text-main); background-color: var(--background-dark); padding: 0; height: 100vh; overflow: hidden; display: flex; }
+
+    .app-container { display: flex; width: 100%; height: 100%; }
+
+    /* 1. Left Sidebar */
+    .tool-sidebar {
+        width: var(--sidebar-width); background-color: var(--background-sidebar); border-right: 1px solid var(--border);
+        display: flex; flex-direction: column; align-items: center; padding-top: 20px; padding-bottom: 20px; z-index: 50; flex-shrink: 0;
+    }
+    
+    .tool-btn {
+        width: 60px; height: 60px; border-radius: 12px; background: transparent; border: none; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: var(--text-secondary); transition: all var(--transition-medium); margin-bottom: 12px;
+    }
+    .tool-btn.disabled {
+        opacity: 0.3; pointer-events: none; filter: grayscale(100%);
+    }
+    .tool-btn img, .tool-btn svg { width: 24px; height: 24px; margin-bottom: 4px; filter: brightness(0.6); transition: filter 0.2s; }
+    .tool-btn span { font-size: 10px; font-weight: 500; }
+    .tool-btn:hover { color: var(--text-main); background-color: rgba(255,255,255,0.05); }
+    .tool-btn:hover img, .tool-btn:hover svg { filter: brightness(1); }
+    .tool-btn.active { color: var(--primary); background-color: var(--primary-light); }
+    .tool-btn.active img, .tool-btn.active svg { filter: invert(48%) sepia(98%) saturate(1499%) hue-rotate(130deg) brightness(94%) contrast(101%); }
+
+    /* Settings Panel */
+    .settings-panel-container {
+        width: var(--settings-panel-width); background: var(--background-dark); border-right: 2px solid var(--primary);
+        display: flex; flex-direction: column; transition: transform 0.3s ease, width 0.3s ease; overflow: hidden; flex-shrink: 0;
+        box-shadow: 5px 0 20px rgba(4, 201, 176, 0.05);
+    }
+    .settings-panel-container.collapsed { width: 0; border-right: none; box-shadow: none; }
+    
+    .settings-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .settings-header h2, .modal-title, .panel-title { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 16px; }
+    
+    .close-panel-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .close-panel-btn img { width: 24px; height: 24px; filter: brightness(0.6); transition: 0.2s; }
+    .close-panel-btn:hover img { filter: brightness(1); }
+
+    .settings-content { flex: 1; overflow-y: auto; padding: 24px; scrollbar-width: thin; scrollbar-color: #333 transparent; }
+    .settings-content::-webkit-scrollbar { width: 6px; }
+    .settings-content::-webkit-scrollbar-thumb { background-color: #333; border-radius: 3px; }
+
+    .settings-section { display: none; animation: fadeIn 0.3s ease; }
+    .settings-section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* 3. Central Artboard */
+    .main-workspace { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+    .artboard-area { flex: 1; overflow: auto; background-color: #121212; background-image: radial-gradient(#333 1px, transparent 1px); background-size: 20px 20px; position: relative; }
+    .artboard-inner { display: flex; min-width: 100%; min-height: 100%; align-items: center; justify-content: center; padding: 60px; }
+    #zoom-wrapper { position: relative; display: inline-block; }
+
+    .preview-container {
+        width: var(--export-width, 1920px); height: var(--export-height, 1080px);
+        background: transparent; border-radius: 0px; display: flex; justify-content: center; align-items: center; overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.05);
+        transform: scale(var(--zoom, 1)); transform-origin: top left; position: absolute; left: 0; top: 0;
+    }
+    
+    /* 2. Bottom Toolbar */
+    .bottom-toolbar {
+        height: 70px; background: var(--background-sidebar); border-top: 1px solid var(--border);
+        display: flex; justify-content: space-between; align-items: center; padding: 0 30px; z-index: 10; flex-shrink: 0;
+    }
+    
+    .top-floating-mobile {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .segmented-control { display: flex; background: #090909; padding: 4px; border-radius: 12px; border: 1px solid #222; }
+    .segmented-control input[type="radio"] { display: none; }
+    .segmented-control label {
+        padding: 8px 20px; color: var(--text-secondary); font-size: 13px; font-weight: 500;
+        cursor: pointer; border-radius: 8px; transition: all 0.2s; font-family: 'Inter', sans-serif;
+    }
+    .segmented-control input[type="radio"]:checked + label { background: var(--background-light); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    
+    .bottom-actions { display: flex; gap: 12px; align-items: center; }
+
+    /* --- Form Controls & Buttons --- */
+    .btn {
+        font-family: 'Inter', sans-serif; font-size: 13px; border-radius: var(--btn-radius);
+        padding: 10px 20px; cursor: pointer; transition: all var(--transition-medium); border: none;
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        background: linear-gradient(135deg, #05B7A0, #083832); color: #FFFFFF; font-weight: 600;
+    }
+    .btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    
+    .btn-secondary { background: transparent; color: var(--text-main); border: 1px solid #444; font-weight: 500;}
+    .btn-secondary:hover { background: rgba(255,255,255,0.05); border-color: #666; filter: none; }
+
+    .btn-icon-text img, .btn-icon-text svg { width: 20px; height: 20px; }
+    .btn.btn-icon-text img, .btn.btn-icon-text svg { filter: brightness(0) invert(1); }
+
+    .input, .select {
+        font-size: 13px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--border-radius);
+        background-color: var(--background-dark); color: var(--text-main); outline: none; width: 100%;
+        margin-bottom: 16px; transition: border-color 0.2s; font-family: 'Inter', sans-serif;
+    }
+    .input:focus, .select:focus { border-color: var(--primary); }
+    .select {
+        appearance: none; cursor: pointer;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%23b2b2b2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 12px center;
+    }
+    
+    input[type="color"] {
+        -webkit-appearance: none; border: 1px solid var(--border); border-radius: var(--border-radius);
+        padding: 0; overflow: hidden; width: 100%; height: 38px; cursor: pointer;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: var(--border-radius); }
+
+    .settings-section label { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 400; }
+
+    .toggle-switch { display: flex; border-radius: var(--border-radius); background: #090909; padding: 2px; margin-bottom: 16px; border: 1px solid #222; }
+    .toggle-btn { flex: 1; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: var(--text-secondary); border-radius: 6px; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+    .toggle-btn.active { background: #222; color: var(--text-main); }
+
+    .layout-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .layout-btn {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 8px;
+        border: 1px solid var(--border); border-radius: 12px; cursor: pointer;
+        background: var(--background-dark); font-size: 12px; color: var(--text-secondary); transition: all 0.2s; font-family: 'Inter', sans-serif;
+    }
+    .layout-btn:hover { border-color: #666; }
+    .layout-btn.active { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .layout-btn img, .layout-btn svg { width: 32px; height: 32px; margin-bottom: 8px; filter: brightness(0.6); transition: 0.2s;}
+    .layout-btn.active img, .layout-btn.active svg { filter: invert(48%) sepia(98%) saturate(1499%) hue-rotate(130deg) brightness(94%) contrast(101%); }
+    .promo-text-align-btn { padding: 8px; flex-direction: row; }
+    .promo-text-align-btn svg { width: 24px !important; height: 24px !important; margin-bottom: 0; }
+
+    .aspect-ratio-btn { border-radius: 12px; padding: 16px 8px; font-size: 13px; }
+    .aspect-ratio-btn small { font-size: 11px; }
+    .aspect-ratio-btn img { display: none; }
+
+    .color-picker-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 16px; }
+    .setting-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+    .setting-row .select { flex: 2; margin-bottom: 0; }
+    .setting-row .input { flex: 1; margin-bottom: 0; }
+    .setting-row input[type="color"] { width: 38px; margin-bottom: 0; }
+    
+    .checkbox-group { display: flex; align-items: center; margin-bottom: 12px; cursor: pointer; }
+    .checkbox-group label { color: var(--text-main); font-size: 13px; margin-bottom: 0; cursor: pointer; }
+    .checkbox-group input[type="checkbox"] {
+        appearance: none; width: 16px; height: 16px; margin-right: 10px; border-radius: 4px; border: 1px solid #666;
+        background: transparent; position: relative; cursor: pointer; flex-shrink: 0;
+    }
+    .checkbox-group input[type="checkbox"]:checked { background: var(--primary); border-color: var(--primary); }
+    .checkbox-group input[type="checkbox"]:checked::after { content: ''; position: absolute; top: 2px; left: 5px; width: 4px; height: 8px; border: solid #000; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    
+    .slider-container { width: 100%; margin-bottom: 16px; }
+    .slider-container input[type="range"] { width: 100%; height: 4px; -webkit-appearance: none; background: #333; border-radius: 2px; outline: none; }
+    .slider-container input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+    .slider-value { font-size: 12px; color: var(--text-secondary); margin-top: 4px; text-align: right; }
+    
+    .artboard-add-item {
+        border: 2px dashed rgba(255, 255, 255, 0.15); 
+        border-radius: var(--border-radius); 
+        background: rgba(255, 255, 255, 0.02);
+        display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer;
+        transition: all 0.2s; min-height: 100px; flex-grow: 1; 
+        color: rgba(255, 255, 255, 0.3);
+        break-inside: avoid;
+        page-break-inside: avoid;
+        -webkit-column-break-inside: avoid;
+    }
+    .artboard-add-item:hover { border-color: var(--primary); color: var(--primary); background: rgba(4, 201, 176, 0.05); }
+    .artboard-add-item svg { width: 40px; height: 40px; margin-bottom: 10px; stroke: currentColor; fill: none; } 
+    .artboard-add-item span { font-size: 35px; font-weight: 500; font-family: 'Inter', sans-serif;}
+
+    /* --- Иконки (Особенности) --- */
+    .icon-btn { padding: 4px; height: 56px; }
+    .icon-btn img { width: 20px; height: 20px; margin-bottom: 4px; filter: grayscale(100%) opacity(0.5); transition: 0.2s; }
+    .icon-btn.active img { filter: invert(48%) sepia(98%) saturate(1499%) hue-rotate(130deg) brightness(94%) contrast(101%); opacity: 1; }
+    .icon-btn span { font-size: 8px; line-height: 1.1; text-align: center; }
+
+    .promo-icon-svg-wrapper svg {
+        width: 100% !important;
+        height: 100% !important;
+        fill: currentColor;
+        display: block;
+    }
+    .promo-icon-svg-wrapper svg path,
+    .promo-icon-svg-wrapper svg polygon,
+    .promo-icon-svg-wrapper svg rect,
+    .promo-icon-svg-wrapper svg circle {
+        fill: currentColor;
+    }
+
+    .promo-custom-img:hover .delete-photo-btn { opacity: 1 !important; }
+    .promo-icon:hover .delete-icon-btn { opacity: 1 !important; pointer-events: auto !important; }
+    .delete-icon-btn:hover { color: var(--primary) !important; }
+
+    /* Выделение и удаление блюд */
+    .selectable-item-block {
+        position: relative;
+    }
+    .selectable-item-block.selected {
+        outline: 2px dashed #ff5252 !important;
+        outline-offset: -2px;
+        z-index: 10;
+        box-shadow: 0 0 10px rgba(255, 82, 82, 0.4);
+    }
+    .delete-item-canvas-btn {
+        position: absolute; top: -14px; right: -14px; width: 36px; height: 36px;
+        background: #ff5252; border-radius: 50%; color: white; border: 2px solid #fff;
+        cursor: pointer; display: flex; justify-content: center; align-items: center; 
+        z-index: 100; opacity: 0; transition: all 0.2s; pointer-events: auto;
+    }
+    .selectable-item-block:hover .delete-item-canvas-btn {
+        opacity: 1; top: -10px; right: -10px;
+    }
+    .delete-item-canvas-btn:hover {
+        background: #d32f2f; transform: scale(1.1);
+    }
+    .delete-item-canvas-btn svg { width: 20px; height: 20px; stroke-width: 2; }
+
+    /* Оранжевая подсветка для переполненных элементов */
+    .overflow-highlight {
+        outline: 3px solid #ff9800 !important;
+        outline-offset: -2px;
+        background-color: rgba(255, 152, 0, 0.05) !important;
+        border-radius: 4px;
+        z-index: 10;
+    }
+
+    /* --- Menu Template Styles --- */
+    .menu-preview { width: 100%; height: 100%; position: relative; background-color: var(--menu-bg-color); display: flex; flex-direction: column; overflow: hidden; background-size: cover; background-position: center; }
+    .menu-list-template { width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; padding: var(--combo-padding, 30px); }
+    
+    /* Улучшенный контейнер списка для корректной работы CSS Columns */
+    .menu-items-container { 
+        flex: 1; overflow: hidden; display: block; height: 100%; width: 100%;
+        position: relative;
+        column-fill: auto; /* Заполнять первый столбец до конца, затем переходить во второй */
+    }
+    .menu-items-container.two-columns { column-count: 2; column-gap: var(--combo-gap, 70px); }
+    
+    /* Идеальное выравнивание столбцов */
+    .menu-section { margin-bottom: 30px; display: block; width: 100%; column-span: all; -webkit-column-span: all; }
+    
+    /* Выравнивание заголовка и даты по верхнему краю */
+    .section-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+    
+    .section-title { font-family: var(--category-font-family); font-size: var(--category-font-size); font-weight: 700; color: var(--category-font-color); flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    /* Стили для пунктов меню с усиленными разделителями */
+    .menu-item { 
+        display: flex; justify-content: space-between; align-items: flex-start; 
+        margin-bottom: 12px; padding-bottom: 12px; 
+        border-bottom: 2px solid rgba(255, 255, 255, 0.4); 
+        break-inside: avoid; page-break-inside: avoid; -webkit-column-break-inside: avoid;
+    }
+    
+    /* Фикс для корректного переноса элементов в CSS Columns */
+    .menu-items-container .menu-item,
+    .menu-items-container .artboard-add-item {
+        display: flex;
+        width: 100%;
+        box-sizing: border-box;
+        vertical-align: top;
+        margin-top: 0;
+    }
+
+    /* Специальное исключение для 9:16 (1 столбец занимает всю ширину) */
+    .preview-container.is-vertical .menu-items-container:not(.two-columns) .menu-item,
+    .preview-container.is-vertical .menu-items-container:not(.two-columns) .artboard-add-item {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .item-content { flex-grow: 1; min-width: 0; }
+    .item-name { font-family: var(--item-font-family); font-weight: 500; font-size: var(--item-font-size); color: var(--item-font-color); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-description { font-family: var(--desc-font-family); font-size: var(--desc-font-size); color: var(--desc-font-color); font-weight: 300; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; }
+    .item-price { font-family: var(--price-font-family); font-weight: 700; font-size: var(--price-font-size); color: var(--price-font-color); white-space: nowrap; margin-left: 20px; flex-shrink: 0; }
+    .volume-price-container { display: flex; gap: 15px; justify-content: flex-end; flex-wrap: nowrap; }
+    .volume-price { display: inline-flex; gap: 4px; align-items: baseline; font-family: var(--price-font-family); font-size: var(--price-font-size); color: var(--price-font-color); font-weight: 700; }
+    .volume-price span { font-family: inherit; font-size: inherit; color: inherit; font-weight: inherit; }
+    
+    .menu-grid-template, .menu-grid-template-3x2, .menu-grid-template-3x3, .menu-grid-template-4x3 { 
+        width: 100%; display: grid; gap: var(--combo-grid-gap, 15px); padding: var(--combo-grid-gap, 15px); background-color: var(--grid-bg-color); flex-grow: 1; min-height: 0; 
+    }
+    .menu-grid-template { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .menu-grid-template-3x2 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .menu-grid-template-3x3 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
+    .menu-grid-template-4x3 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 1fr); }
+    
+    .grid-cell { background-color: var(--cell-bg-color); border-radius: var(--border-radius); display: flex; position: relative; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+    .grid-gradient-overlay { 
+        position: absolute; left: 0; top: 0; right: 0; bottom: 0; width: 100%; height: 100%; 
+        z-index: 2; pointer-events: none; border-radius: var(--border-radius);
+    }
+    
+    .grid-cell-content { flex: 2; padding: 15px 20px; display: flex; flex-direction: column; gap: 5px; z-index: 3; min-width: 0; height: 100%; position: relative; pointer-events: none; }
+    .grid-cell-content > * { pointer-events: auto; width: fit-content; max-width: 100%; }
+    
+    /* Управление описанием блюда */
+    .grid-cell .item-description { 
+        flex-grow: 0; height: fit-content; width: fit-content; max-width: 66.66%; 
+        color: var(--desc-font-color); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; 
+    }
+    /* Для вертикального формата (9:16) */
+    .preview-container.is-vertical .grid-cell .item-description { 
+        max-width: 100%; width: fit-content; min-height: 0; 
+    }
+    
+    .grid-cell .item-name { color: var(--item-font-color); word-break: break-word; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .grid-cell .item-price { text-align: left; font-family: var(--price-font-family); font-size: var(--price-font-size); color: var(--price-font-color); align-self: flex-start; margin-left: 0; padding-left: 0; }
+    .grid-cell .volume-price-container { flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 4px; width: 100%; margin-left: 0; padding-left: 0; }
+    
+    .grid-cell .item-photo-container { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; z-index: 1; }
+    .grid-cell .item-photo { width: 100%; height: 100%; background-size: auto 100%; background-position: center; background-repeat: no-repeat; cursor: move; }
+    
+    /* Увеличенные иконки загрузки и удаления фото */
+    .grid-cell .upload-photo-btn { cursor: pointer; border: none; background: rgba(0,0,0,0.4); width: 64px; height: 64px; border-radius: 50%; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 10; display: flex; align-items: center; justify-content: center; pointer-events: auto; transition: color 0.2s; }
+    .grid-cell .upload-photo-btn:hover { color: var(--primary); }
+    .grid-cell .upload-photo-btn svg { width: 32px; height: 32px; stroke: currentColor; transition: transform 0.2s; } 
+    .grid-cell .upload-photo-btn:hover svg { transform: scale(1.2); }
+    
+    .delete-photo-btn { position: absolute; top: 8px; right: 8px; width: 64px; height: 64px; background: rgba(25, 28, 31, 0.8); border: none; border-radius: 50%; cursor: pointer; z-index: 15; opacity: 0; transition: all 0.2s; display: flex; align-items: center; justify-content: center; color: #ffffff; }
+    .item-photo-container:hover .delete-photo-btn { opacity: 1; }
+    .delete-photo-btn:hover { color: var(--primary); }
+    .delete-photo-btn svg { width: 32px; height: 32px; stroke: currentColor; transition: transform 0.2s, stroke 0.2s; }
+    .delete-photo-btn:hover svg { transform: scale(1.2); }
+
+    .promo-template { position: relative; width: 100%; height: 100%; overflow: hidden; background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: center; }
+    .promo-content { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; padding: var(--combo-promo-padding, 40px); text-align: var(--promo-text-align, left); }
+    .promo-title { font-size: var(--promo-title-font-size); font-family: var(--promo-title-font-family); color: var(--promo-title-font-color); font-weight: 600; margin-bottom: 20px; line-height: 1.1; display: inline-flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: var(--promo-justify, flex-start); position: relative; z-index: 10; cursor: move; text-wrap: balance; word-break: break-word;}
+    
+    .promo-text { font-size: var(--promo-text-font-size); font-family: var(--promo-text-font-family); color: var(--promo-text-font-color); margin-bottom: 30px; line-height: 1.3; display: inline-block; position: relative; z-index: 10; cursor: move; text-wrap: balance; word-break: break-word;}
+    
+    .promo-comment { font-family: var(--promo-comment-font-family, var(--desc-font-family)); font-size: var(--promo-comment-font-size, 10px); color: var(--promo-comment-font-color, var(--promo-text-font-color)); margin-top: auto; padding-top: 15px; opacity: 0.8; text-align: left !important; width: 100%; box-sizing: border-box; display: inline-block; position: relative; z-index: 10; cursor: move; text-wrap: balance; word-break: break-word;}
+    
+    .promo-price-container { display: inline-flex; align-items: baseline; gap: 25px; flex-wrap: wrap; justify-content: var(--promo-justify, flex-start); position: relative; cursor: move;}
+    .promo-sml-column { flex-direction: column !important; align-items: var(--promo-align-items, flex-start) !important; gap: 8px !important; }
+    .promo-content > div:first-child { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: var(--promo-align-items, flex-start); }
+    .promo-price { font-size: var(--promo-price-font-size); font-family: var(--promo-price-font-family); color: var(--promo-price-font-color); font-weight: bold; }
+    .promo-discount { font-size: calc(var(--promo-price-font-size) * 0.5); font-family: var(--promo-price-font-family); color: var(--discount-font-color); font-weight: bold; background-color: var(--discount-bg-color); padding: 5px 15px; border-radius: 40px; }
+    
+    .combined-template { display: grid; grid-template-columns: 1fr 1fr; width: 100%; height: 100%; overflow: hidden; }
+    /* Строгие ограничения для комбо-блоков, чтобы сетка и колонки не "разлетались" из-за контента */
+    .combined-promo-part { position: relative; z-index: 1; background-size: cover; background-position: center; overflow: hidden; color: white; min-width: 0; min-height: 0; }
+    .combined-menu-part { z-index: 2; grid-column: 1 / 2; background-color: var(--menu-bg-color); position: relative; display: flex; flex-direction: column; background-size: cover; background-position: center; min-width: 0; min-height: 0; overflow: hidden; }
+    
+    .menu-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 15px 20px; flex-shrink: 0; }
+    
+    .menu-grid-category-title { font-family: var(--category-font-family); font-size: var(--category-font-size); font-weight: 700; color: var(--category-font-color); }
+    .menu-date { font-family: var(--item-font-family); font-size: calc(var(--item-font-size) * 0.35); color: var(--text-secondary); line-height: 1.2; }
+    .menu-date.auto-contrast { color: var(--date-contrast-color, #FFFFFF); }
+
+    .preview-container.is-vertical .combined-template { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    .preview-container.is-vertical .combined-menu-part { grid-column: 1 / 2; grid-row: 1 / 2; }
+    .preview-container.is-vertical .combined-promo-part { grid-column: 1 / 2; grid-row: 2 / 3; }
+
+    .resizable-container.selected { outline: 2px dashed var(--primary); box-shadow: 0 0 10px rgba(4, 201, 176, 0.2); }
+    
+    /* Увеличенные хэндлы для ресайза картинок и текста */
+    .resize-handle { 
+        position: absolute; width: 18px; height: 18px; background: var(--primary); 
+        border: 3px solid white; border-radius: 50%; z-index: 12; display: none; 
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .resize-handle.bg-handle.br { bottom: 10px; right: 10px; }
+    .resize-handle.bg-handle.bl { bottom: 10px; left: 10px; }
+    .resize-handle.bg-handle.tr { top: 10px; right: 10px; }
+    .resize-handle.bg-handle.tl { top: 10px; left: 10px; }
+    
+    .resize-handle::after { /* скрытая увеличенная область клика */
+        content: ''; position: absolute; top: -12px; left: -12px; right: -12px; bottom: -12px;
+    }
+    .resize-handle:not(.bg-handle).br { bottom: -9px; right: -9px; cursor: se-resize; }
+    .resize-handle:not(.bg-handle).bl { bottom: -9px; left: -9px; cursor: ne-sw-resize; }
+    .resize-handle:not(.bg-handle).tr { top: -9px; right: -9px; cursor: ne-sw-resize; }
+    .resize-handle:not(.bg-handle).tl { top: -9px; left: -9px; cursor: se-resize; }
+    
+    .resize-handle.bg-handle.br { cursor: se-resize; }
+    .resize-handle.bg-handle.bl { cursor: ne-sw-resize; }
+    .resize-handle.bg-handle.tr { cursor: ne-sw-resize; }
+    .resize-handle.bg-handle.tl { cursor: se-resize; }
+
+    /* Новые хэндлы для изменения ширины текста (переносы) */
+    .resize-handle.text-handle { background: #fff; border-color: var(--primary); border-radius: 4px; height: 24px; width: 12px; }
+    .resize-handle.text-handle.mr { right: -12px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+    .resize-handle.text-handle.ml { left: -12px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+
+    .resizable-container.selected > .resize-handle { display: block; }
+    
+    /* Улучшенная Drag-подсказка */
+    .drag-indicator {
+        position: absolute; top: -38px; left: 50%; transform: translateX(-50%);
+        background: rgba(4, 201, 176, 0.95); color: #fff; padding: 6px 12px; border-radius: 6px;
+        font-size: 22px; font-weight: 600; display: none; align-items: center; gap: 8px;
+        pointer-events: auto; 
+        white-space: nowrap; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.4); user-select: none;
+        border: 2px solid #fff; cursor: move;
+    }
+    .drag-indicator svg { width: 22px; height: 22px; fill: currentColor; }
+    .drag-indicator:active { cursor: grabbing; }
+    
+    .resizable-container:hover > .drag-indicator,
+    .resizable-container.selected > .drag-indicator,
+    .resizable-container:focus-within > .drag-indicator { display: flex; }
+    
+    /* Блокируем Drag-подсказку для элементов, которые нельзя перемещать */
+    .resizable-container.no-pan > .drag-indicator { display: none !important; }
+
+    /* Modals & Loaders */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
+    .modal { background: var(--background-dark); padding: 24px; border-radius: 12px; width: 440px; box-shadow: var(--card-hover-shadow); border: 1px solid #333; }
+    .modal-title { margin-bottom: 20px; text-align: center; }
+    .modal-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; } 
+    .modal-actions.right-aligned { justify-content: flex-end; }
+    
+    .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; color: white; flex-direction: column; }
+    .spinner { border: 4px solid #333; border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .drop-area { border: 2px dashed #444; border-radius: var(--border-radius); padding: 20px; text-align: center; margin-bottom: 15px; cursor: pointer; font-size: 12px; color: var(--text-secondary); background: var(--background-dark); }
+    .drop-area:hover { border-color: var(--primary); background: rgba(4,201,176,0.05); }
+
+    .manual-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-radius: 6px; margin-bottom: 8px; background: #222; font-size: 12px; cursor: grab; border: 1px solid transparent; }
+    .manual-item:hover { border-color: #444; }
+    .manual-item-name { flex-grow: 1; font-weight: 500; color: #fff; pointer-events: none; }
+    .manual-item-actions button { background: none; border: none; cursor: pointer; padding: 4px; display: flex; transition: color 0.2s; align-items: center; justify-content: center; }
+    .manual-item-actions button svg { width: 28px; height: 28px; color: #d1d5db; transition: 0.2s; }
+    .manual-item-actions button:hover svg { color: #ff5252; }
+    
+    .add-item-area { border: 1px dashed #444; padding: 10px; text-align: center; cursor: pointer; border-radius: 6px; font-size: 12px; margin-bottom: 15px; }
+    .add-item-area:hover { border-color: var(--primary); color: var(--primary); }
+    
+    .drag-over { border-top: 2px solid var(--primary) !important; }
+    .dragging { opacity: 0.5; }
+
+    /* ==================================================== */
+    /* АДАПТАЦИЯ ПОД ПЛАНШЕТЫ И МОБИЛЬНЫЕ УСТРОЙСТВА        */
+    /* ==================================================== */
+
+    @media (max-width: 1024px) {
+        .settings-panel-container {
+            position: absolute;
+            left: var(--sidebar-width);
+            top: 0;
+            height: 100%;
+            z-index: 1000;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.8);
+        }
+        .bottom-toolbar {
+            padding: 0 15px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        :root {
+            --sidebar-width: 60px;
+            --settings-panel-width: calc(100vw - 60px);
+        }
+        .tool-btn {
+            width: 50px;
+            height: 50px;
+        }
+        .tool-btn span {
+            font-size: 9px;
+        }
+        .artboard-inner {
+            padding: 20px;
+        }
+        .bottom-toolbar {
+            height: auto;
+            flex-direction: row;
+            padding: 15px;
+            justify-content: center;
+        }
+        .top-floating-mobile {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            background: rgba(18, 20, 22, 0.95);
+            backdrop-filter: blur(5px);
+            padding: 8px 12px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            border: 1px solid var(--border);
+            width: max-content;
+            max-width: 95%;
+            gap: 12px;
+            justify-content: center !important;
+            flex-wrap: nowrap !important;
+        }
+        .bottom-actions {
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .bottom-actions .btn {
+            flex: 1;
+            white-space: nowrap;
+            font-size: 11px;
+            padding: 10px;
+        }
+        .modal {
+            width: 95%;
+            max-width: 440px;
+            padding: 16px;
+        }
+        .modal .layout-buttons {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+        
+        /* Панель настроек: адаптация сеток */
+        #format-panel-buttons[style],
+        #layout-buttons[style] {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+        #promo-icons-container[style] {
+            grid-template-columns: repeat(3, 1fr) !important;
+        }
+        .color-picker-row {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+        .setting-row {
+            flex-direction: column;
+            gap: 4px;
+        }
+        .setting-row .select, .setting-row .input, .setting-row input[type="color"] {
+            width: 100%;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .segmented-control label {
+            padding: 6px 10px;
+            font-size: 11px;
+        }
+        .top-floating-mobile {
+            gap: 6px;
+            padding: 6px;
+        }
+        .zoom-controls {
+            gap: 2px;
+        }
+        #zoom-level-text {
+            font-size: 11px;
+            min-width: 35px;
+        }
+    }
+</style>
+</head>
+<body>
+
+<!-- Toast Warning -->
+<div id="toast-warning" style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: #007568; color: #04C9B0; padding: 10px 20px; border-radius: 8px; font-weight: 400; font-size: 14px; z-index: 2000; transition: transform 0.3s ease, opacity 0.3s ease; opacity: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.2); pointer-events: none; text-align: center;">
+    Слишком много пунктов.<br>Уменьшите количество или размер шрифта.
+</div>
+
+<div class="app-container">
+    
+    <!-- 1. Left Sidebar -->
+    <aside class="tool-sidebar" style="justify-content: flex-start; padding-bottom: 20px;">
+        <button class="tool-btn" data-target="panel-format">
+            <img src="images/format.svg" alt="Холст">
+            <span>Холст</span>
+        </button>
+        <button class="tool-btn" data-target="panel-content">
+            <img src="images/doc.svg" alt="Содержимое">
+            <span>Содержимое</span>
+        </button>
+        <button class="tool-btn" data-target="panel-layout">
+            <img src="images/maket.svg" alt="Структура">
+            <span>Структура</span>
+        </button>
+        <button class="tool-btn" data-target="panel-text">
+            <img src="images/text.svg" alt="Оформление">
+            <span>Оформление</span>
+        </button>
+        
+        <div style="flex-grow: 1;"></div>
+        
+        <button class="tool-btn" id="info-btn-sidebar" style="margin-bottom: 0; margin-top: auto;">
+            <img src="images/info.svg" alt="Инфо">
+            <span>Инфо</span>
+        </button>
+    </aside>
+
+    <!-- Settings Panel -->
+    <aside class="settings-panel-container collapsed" id="settings-panel">
+        <div class="settings-header">
+            <h2 id="panel-title">Содержимое</h2>
+            <button class="close-panel-btn" id="close-settings" title="Закрыть">
+                <img src="images/tabclose.svg" alt="Закрыть">
+            </button>
+        </div>
+        <div class="settings-content">
+
+            <!-- PANEL 0: Format -->
+            <div id="panel-format" class="settings-section">
+                <label>Размер холста</label>
+                <div class="layout-buttons" style="grid-template-columns: repeat(2, 1fr);" id="format-panel-buttons">
+                    <button class="layout-btn aspect-ratio-btn active" data-ratio="16/9" data-width="1920" data-height="1080">16:9<br><small>1920x1080</small></button>
+                    <button class="layout-btn aspect-ratio-btn" data-ratio="9/16" data-width="1080" data-height="1920">9:16<br><small>1080x1920</small></button>
+                    <button class="layout-btn aspect-ratio-btn" data-ratio="4/3" data-width="1600" data-height="1200">4:3<br><small>1600x1200</small></button>
+                    <button class="layout-btn aspect-ratio-btn" data-ratio="3/2" data-width="1920" data-height="1280">3:2<br><small>1920x1280</small></button>
+                </div>
+            </div>
+            
+            <!-- PANEL 1: Content -->
+            <div id="panel-content" class="settings-section">
+                <div class="menu-only-settings">
+                    <div class="toggle-switch">
+                        <button id="toggle-manual" class="toggle-btn active" data-mode="manual">Ввести вручную</button>
+                        <button id="toggle-upload" class="toggle-btn" data-mode="upload">Загрузить файл</button>
+                    </div>
+                    
+                    <div id="upload-mode-content" style="display: none;">
+                        <div class="drop-area" id="menu-drop-area" onclick="document.getElementById('file-input').click();">
+                            <span style="color: var(--primary); font-weight: bold; text-decoration: underline;">Загрузите меню</span><br>в формате Excel или TXT<br>...или 
+                            <a href="menu.xlsx" download="menu.xlsx" id="download-template-btn" style="color: var(--primary); text-decoration: underline; background: none; border: none; padding: 0; font: inherit; cursor: pointer; font-weight: bold;" onclick="event.stopPropagation();">выберите шаблон</a>
+                            <input type="file" id="file-input" accept=".xlsx, .xls, .csv, .txt" style="display: none;">
+                            <div id="menu-file-info" style="margin-top: 8px;">Файл не выбран</div>
+                        </div>
+                    </div>
+                    
+                    <div id="manual-mode-content">
+                        <p style="font-size: 11px; color: #888; margin-bottom: 12px;">Кликайте по текстам для ред. Перетаскивайте карточки ниже для смены очередности.</p>
+                        <div id="manual-item-list"></div>
+                        <div id="add-manual-item-btn" class="add-item-area">+ Добавить позицию</div>
+                        <button id="export-excel-btn" class="btn btn-secondary" style="width: 100%;">Сохранить как Excel</button>
+                    </div>
+                </div>
+
+                <div class="promo-only-settings" style="display:none;">
+                    <p style="font-size: 14px; text-align: center; color: var(--text-secondary); padding: 20px 0;">Нажимая на поля текста в превью, вы можете создать ваше уникальное предложение. Все блоки можно перемещать мышкой. Тяните за боковые края для изменения ширины текста.</p>
+                </div>
+                
+                <div class="combo-only-settings" style="display:none;">
+                    <p style="font-size: 14px; text-align: center; color: var(--text-secondary); line-height: 1.5; padding: 20px 0;">
+                        Внесите нужные изменения в предыдущих разделах "Меню" и "Акция", ведь комбинированная страница, это совмещенный вариант уже созданных страниц.
+                    </p>
+                </div>
+            </div>
+
+            <!-- PANEL 2: Layout / Structure -->
+            <div id="panel-layout" class="settings-section">
+                <!-- Комбо-переключатель внутри структуры -->
+                <div class="combo-sub-tabs toggle-switch" style="display: none; margin-bottom: 20px;">
+                    <button class="toggle-btn combo-sub-btn active" data-target="menu">Меню</button>
+                    <button class="toggle-btn combo-sub-btn" data-target="promo">Акция</button>
+                </div>
+
+                <div class="menu-only-settings">
+                    <label>Макет</label>
+                    <div class="layout-buttons" id="layout-buttons" style="grid-template-columns: repeat(3, 1fr);">
+                        <button class="layout-btn active" data-layout="grid">
+                            <img src="images/2x2.svg" alt="2x2">2x2
+                        </button>
+                        <button class="layout-btn" data-layout="grid3x2">
+                            <img src="images/3x2.svg" alt="3x2">3x2
+                        </button>
+                        <button class="layout-btn" data-layout="grid3x3">
+                            <img src="images/3x3.svg" alt="3x3">3x3
+                        </button>
+                        <button class="layout-btn" data-layout="grid4x3">
+                            <img src="images/4x3.svg" alt="4x3">4x3
+                        </button>
+                        <button class="layout-btn" data-layout="list">
+                            <img src="images/spisok.svg" alt="Список">Список
+                        </button>
+                    </div>
+                    
+                    <div class="checkbox-group list-only-settings" style="display:none;"><input type="checkbox" id="list-two-columns-checkbox"><label for="list-two-columns-checkbox">Список в 2 столбца</label></div>
+                    
+                    <div class="checkbox-group"><input type="checkbox" id="show-description-checkbox" checked><label for="show-description-checkbox">Описания блюд</label></div>
+                    <div class="checkbox-group"><input type="checkbox" id="show-date-checkbox" checked><label for="show-date-checkbox">Показывать дату</label></div>
+                    <div class="checkbox-group"><input type="checkbox" id="show-sml-prices-checkbox"><label for="show-sml-prices-checkbox">Цены S, M, L</label></div>
+                    
+                    <label style="margin-top: 15px;">Валюта</label>
+                    <select id="currency-select" class="select">
+                        <option value="₽" selected>Рубль (₽)</option>
+                        <option value="₸">Тенге (₸)</option>
+                    </select>
+                </div>
+
+                <div class="promo-only-settings" style="display:none;">
+                    <div class="checkbox-group"><input type="checkbox" id="promo-show-price-checkbox" checked><label for="promo-show-price-checkbox">Блок цены</label></div>
+                    <div class="checkbox-group"><input type="checkbox" id="promo-show-sml-prices-checkbox"><label for="promo-show-sml-prices-checkbox">Цены S, M, L</label></div>
+                    
+                    <!-- Иконки Особенности -->
+                    <div id="promo-icons-group" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 15px;">
+                        <label>Иконки (Особенности)</label>
+                        <div class="layout-buttons" style="grid-template-columns: repeat(5, 1fr); gap: 4px;" id="promo-icons-container">
+                            <button class="layout-btn icon-btn" data-icon="vegan"><img src="images/vegan.svg" alt="Vegan"><span>Веган</span></button>
+                            <button class="layout-btn icon-btn" data-icon="glutenfree"><img src="images/glutenfree.svg" alt="Gluten Free"><span>Без глютена</span></button>
+                            <button class="layout-btn icon-btn" data-icon="hot"><img src="images/hot.svg" alt="Hot"><span>Острое</span></button>
+                            <button class="layout-btn icon-btn" data-icon="new"><img src="images/new.svg" alt="New"><span>Новинка</span></button>
+                            <button class="layout-btn icon-btn" data-icon="halal"><img src="images/halal.svg" alt="Halal"><span>Халяль</span></button>
+                        </div>
+                    </div>
+
+                    <!-- Загрузка своей картинки поверх промо -->
+                    <div id="promo-custom-image-group" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 15px;">
+                        <button class="btn btn-secondary" style="width: 100%;" onclick="document.getElementById('custom-promo-img-upload').click()">+ Загрузить свою картинку</button>
+                        <input type="file" id="custom-promo-img-upload" accept="image/*" style="display: none;">
+                    </div>
+
+                    <div id="promo-discount-group" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 15px;">
+                        <label>Скидка (Рядом с ценой)</label>
+                        <div class="slider-container">
+                            <input type="range" id="promo-discount-slider" min="0" max="100" value="0">
+                            <div class="slider-value" id="promo-discount-value">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL 3: Text & Design -->
+            <div id="panel-text" class="settings-section">
+                <!-- Комбо-переключатель внутри оформления -->
+                <div class="combo-sub-tabs toggle-switch" style="display: none; margin-bottom: 20px;">
+                    <button class="toggle-btn combo-sub-btn active" data-target="menu">Меню</button>
+                    <button class="toggle-btn combo-sub-btn" data-target="promo">Акция</button>
+                </div>
+
+                <!-- Menu Text & BG -->
+                <div class="menu-only-settings">
+                    <label>Цвета и Фон</label>
+                    <div class="color-picker-row">
+                        <div class="color-picker-item"><label>Фон меню</label><input type="color" id="menu-bg-color-picker" value="#007568"></div>
+                        <div class="color-picker-item grid-color-item"><label>Фон ячейки</label><input type="color" id="cell-bg-color-picker" value="#313131"></div>
+                    </div>
+                    <select id="menu-bg-type-select" class="select"><option value="color">Сплошной цвет</option><option value="image" selected>Изображение</option></select>
+                    <div id="menu-bg-image-container" style="display: none;">
+                        <button class="btn btn-secondary" style="width:100%" onclick="document.getElementById('menu-background-upload').click()">Выбрать фон</button>
+                        <input type="file" id="menu-background-upload" accept="image/*" style="display: none;">
+                    </div>
+
+                    <label style="margin-top: 15px;">Шрифт категорий</label>
+                    <div class="setting-row">
+                        <select id="category-font-select" class="select font-select"></select>
+                        <input type="number" id="category-font-size" class="input" value="72" min="0">
+                        <input type="color" id="category-color-picker" value="#FFFFFF">
+                    </div>
+                    <label id="item-font-label">Шрифт позиции</label>
+                    <div class="setting-row">
+                        <select id="item-font-select" class="select font-select"></select>
+                        <input type="number" id="item-font-size" class="input" value="54" min="0">
+                        <input type="color" id="item-color-picker" value="#FFFFFF">
+                    </div>
+                    <label>Шрифт описания</label>
+                    <div class="setting-row">
+                        <select id="desc-font-select" class="select font-select"></select>
+                        <input type="number" id="desc-font-size" class="input" value="27" min="0">
+                        <input type="color" id="desc-color-picker" value="#FFFFFF">
+                    </div>
+                    <div class="grid-color-item">
+                        <label>Затемнение картинки</label>
+                        <div class="slider-container"><input type="range" id="grid-gradient-slider" min="0" max="100" value="10"></div>
+                        <label>Шрифт цены</label>
+                        <div class="setting-row">
+                            <select id="price-font-select" class="select font-select"></select>
+                            <input type="number" id="price-font-size" class="input" value="36" min="0">
+                            <input type="color" id="price-color-picker" value="#40F7E2">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Promo Text & BG -->
+                <div class="promo-only-settings" style="display:none;">
+                    <label>Выравнивание текста</label>
+                    <div class="layout-buttons" id="promo-text-align-buttons" style="grid-template-columns: repeat(3, 1fr);">
+                        <button class="layout-btn promo-text-align-btn active" data-align="left">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </button>
+                        <button class="layout-btn promo-text-align-btn" data-align="center">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="7" y1="12" x2="17" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </button>
+                        <button class="layout-btn promo-text-align-btn" data-align="right">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </button>
+                    </div>
+
+                    <label style="margin-top:15px;">Шрифт заголовка</label>
+                    <div class="setting-row">
+                        <select id="promo-title-font-select" class="select font-select"></select>
+                        <input type="number" id="promo-title-size" class="input" value="160" min="0">
+                        <input type="color" id="promo-title-color-picker" value="#FFFFFF">
+                    </div>
+                    <label>Шрифт описания акции</label>
+                     <div class="setting-row">
+                        <select id="promo-text-font-select" class="select font-select"></select>
+                        <input type="number" id="promo-text-size" class="input" value="90" min="0">
+                        <input type="color" id="promo-text-color-picker" value="#FFFFFF">
+                    </div>
+                    <label>Шрифт комментария</label>
+                     <div class="setting-row">
+                        <select id="promo-comment-font-select" class="select font-select"></select>
+                        <input type="number" id="promo-comment-size" class="input" value="45" min="0">
+                        <input type="color" id="promo-comment-color-picker" value="#FFFFFF">
+                    </div>
+                    <label>Шрифт цены</label>
+                    <div class="setting-row">
+                        <select id="promo-price-font-select" class="select font-select"></select>
+                        <input type="number" id="promo-price-size" class="input" value="120" min="0">
+                        <input type="color" id="promo-price-color-picker" value="#40F7E2">
+                    </div>
+                    
+                    <div id="promo-discount-design" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 15px;">
+                        <label>Цвет скидки (Плашка / Текст)</label>
+                        <div class="setting-row">
+                            <input type="color" id="discount-bg-color-picker" value="rgba(255, 255, 255, 0.2)">
+                            <input type="color" id="discount-color-picker" value="#ff5252">
+                        </div>
+                    </div>
+                    
+                    <div id="promo-icon-color-design" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 15px;">
+                        <label>Цвет иконок</label>
+                        <div class="setting-row">
+                            <input type="color" id="promo-icon-color-picker" value="#04C9B0">
+                        </div>
+                    </div>
+
+                    <label style="margin-top:15px;">Фон акции</label>
+                     <select id="promo-bg-type-select" class="select"><option value="color">Сплошной цвет</option><option value="image" selected>Изображение</option></select>
+                    <div id="bg-color-container" style="display: none;"><input type="color" id="bg-color-picker" value="#007568"></div>
+                    <div id="bg-image-container">
+                        <button class="btn btn-secondary" style="width:100%;" onclick="document.getElementById('promo-background-upload').click()">Выбрать фон</button>
+                        <input type="file" id="promo-background-upload" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 3. Central Artboard Area -->
+    <main class="main-workspace">
+        <div class="artboard-area" id="artboard-scroll">
+            <div class="artboard-inner">
+                <div id="zoom-wrapper">
+                    <div class="preview-container" id="export-container">
+                        <div class="menu-preview" id="menu-preview">
+                            <!-- Dynamic Content -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Bottom Toolbar -->
+        <div class="bottom-toolbar">
+            <div class="top-floating-mobile">
+                <div class="segmented-control" id="mode-tabs">
+                    <input type="radio" id="tab-menu" name="view-tab" value="menu" checked>
+                    <label for="tab-menu">Меню</label>
+                    <input type="radio" id="tab-promo" name="view-tab" value="promo">
+                    <label for="tab-promo">Акция</label>
+                    <input type="radio" id="tab-combined" name="view-tab" value="combined">
+                    <label for="tab-combined">Комбо</label>
+                </div>
+                
+                <div class="zoom-controls" style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn-secondary" id="zoom-out-btn" style="padding: 6px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Отдалить">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                    <span id="zoom-level-text" style="font-size: 13px; font-weight: 500; min-width: 45px; text-align: center; color: var(--text-secondary);">100%</span>
+                    <button class="btn-secondary" id="zoom-in-btn" style="padding: 6px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Приблизить">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="bottom-actions">
+                <button class="btn btn-icon-text" id="download-png-btn">
+                    <img src="images/savepng.svg" alt="Сохранить">
+                    Сохранить картинку
+                </button>
+                <button class="btn btn-icon-text" id="download-mp4-btn">
+                    <img src="images/savepng.svg" alt="Сохранить">
+                    Сохранить видео
+                </button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="aspect-ratio-modal" style="display: flex;">
+    <div class="modal">
+        <div class="modal-title">Формат холста</div>
+        <div class="layout-buttons" style="grid-template-columns: repeat(4, 1fr);">
+            <button class="layout-btn aspect-ratio-btn active" data-ratio="16/9" data-width="1920" data-height="1080">16:9<br><small>1920x1080</small></button>
+            <button class="layout-btn aspect-ratio-btn" data-ratio="9/16" data-width="1080" data-height="1920">9:16<br><small>1080x1920</small></button>
+            <button class="layout-btn aspect-ratio-btn" data-ratio="4/3" data-width="1600" data-height="1200">4:3<br><small>1600x1200</small></button>
+            <button class="layout-btn aspect-ratio-btn" data-ratio="3/2" data-width="1920" data-height="1280">3:2<br><small>1920x1280</small></button>
+        </div>
+        <div class="modal-actions"><button class="btn" id="confirm-aspect-ratio" style="width:50%;">Начать</button></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="mp4-modal" style="display: none;">
+    <div class="modal">
+        <div class="modal-title">Сохранить как видео</div>
+        <input type="text" id="mp4-filename" class="input" placeholder="Имя файла (без расширения)" value="менюборд">
+        <div class="setting-row" style="align-items: center;">
+            <label style="margin-top:10px; flex: 1;">Длительность (сек):</label>
+            <div style="display:flex; align-items:center; gap: 8px; flex: 1; margin-top: 10px;">
+                <input type="number" id="mp4-duration" class="input" value="5" min="1" max="600" style="margin-bottom:0; width: 60px; padding: 10px 8px;">
+                <span id="mp4-duration-display" style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">5 сек.</span>
+            </div>
+        </div>
+        <div class="modal-actions right-aligned">
+            <button class="btn btn-secondary" id="cancel-mp4">Отмена</button>
+            <button class="btn" id="save-mp4">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="info-modal" style="display: none;">
+    <div class="modal">
+        <div class="modal-title">Инструкция</div>
+        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px;">
+            <p>1. Выберите нужный <b>Формат холста</b> в левом меню.</p>
+            <p>2. Вкладка <b>Содержимое</b>: Загрузите данные через Excel/TXT или введите меню вручную.</p>
+            <p>3. Вкладка <b>Структура</b>: Выберите сетку или список для расстановки блюд.</p>
+            <p>4. Вкладка <b>Оформление</b>: Настройте цвета, шрифты и их размеров.</p>
+            <p>5. Нажмите колесико мыши (среднюю кнопку), чтобы перемещаться по холсту.</p>
+            <p>6. Сохраните результат как Изображение или Видео.</p>
+        </div>
+        <div class="modal-actions">
+            <button class="btn" id="close-info-modal" style="width: 50%;">Понятно</button>
+        </div>
+    </div>
+</div>
+
+<div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div><div id="loading-text">Генерация...</div>
+</div>
+
+<input type="file" id="grid-photo-upload" accept="image/*" style="display: none;">
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const fonts = [
+            {name: 'Inter', val: "'Inter', sans-serif"}, {name: 'Roboto', val: "'Roboto', sans-serif"},
+            {name: 'Open Sans', val: "'Open Sans', sans-serif"}, {name: 'PT Sans', val: "'PT Sans', sans-serif"},
+            {name: 'Playfair Display', val: "'Playfair Display', serif"}, {name: 'Montserrat', val: "'Montserrat', sans-serif"},
+            {name: 'Oswald', val: "'Oswald', sans-serif"}, {name: 'Raleway', val: "'Raleway', sans-serif"},
+            {name: 'Nunito', val: "'Nunito', sans-serif"}, {name: 'Rubik', val: "'Rubik', sans-serif"},
+            {name: 'Cormorant', val: "'Cormorant', serif"}
+        ];
+        document.querySelectorAll('.font-select').forEach(select => {
+            select.innerHTML = fonts.map(f => `<option value="${f.val}">${f.name}</option>`).join('');
+        });
+
+        function mapKeyToFontInput(key) {
+            switch(key) {
+                case 'text-category': return 'category-font-size';
+                case 'text-name': return 'item-font-size';
+                case 'text-desc': return 'desc-font-size';
+                case 'text-price': return 'price-font-size';
+                case 'text-date': return 'item-font-size'; 
+                case 'promo-title': return 'promo-title-size';
+                case 'promo-text': return 'promo-text-size';
+                case 'promo-comment': return 'promo-comment-size';
+                case 'promo-price': return 'promo-price-size';
+                default: return null;
+            }
+        }
+
+        let overflowToastTimeout = null;
+
+        function showWarning(message) {
+            const toast = document.getElementById('toast-warning');
+            if(toast) {
+                if (message) toast.innerHTML = message;
+                toast.style.transform = 'translateX(-50%) translateY(0)';
+                toast.style.opacity = '1';
+                
+                if (overflowToastTimeout) clearTimeout(overflowToastTimeout);
+                overflowToastTimeout = setTimeout(() => {
+                    hideWarning();
+                }, 3000);
+            }
+        }
+
+        function hideWarning() {
+            const toast = document.getElementById('toast-warning');
+            if(toast) {
+                toast.style.transform = 'translateX(-50%) translateY(-100px)';
+                toast.style.opacity = '0';
+            }
+            if (overflowToastTimeout) {
+                clearTimeout(overflowToastTimeout);
+                overflowToastTimeout = null;
+            }
+        }
+
+        function alignListColumns() {
+            if (state.layout !== 'list' || !controls.listTwoColumnsCheck.checked) return;
+            const container = document.querySelector('.menu-items-container.two-columns');
+            if (!container) return;
+
+            // Сбрасываем высоты
+            const items = Array.from(container.querySelectorAll('.menu-item, .artboard-add-item'));
+            items.forEach(item => {
+                item.style.minHeight = 'auto';
+                item.style.marginTop = '0px'; // Сброс отступов
+            });
+
+            // Разбиваем элементы на два массива (левая и правая колонка)
+            const col1 = [];
+            const col2 = [];
+            const halfWidth = container.clientWidth / 2;
+
+            items.forEach(item => {
+                if (item.offsetLeft < halfWidth) {
+                    col1.push(item);
+                } else if (item.offsetLeft >= halfWidth && item.offsetLeft < container.clientWidth) {
+                    col2.push(item);
+                }
+            });
+
+            // Синхронизируем высоту по рядам (берем максимальную высоту из пары)
+            const rowCount = Math.max(col1.length, col2.length);
+            for (let i = 0; i < rowCount; i++) {
+                const item1 = col1[i];
+                const item2 = col2[i];
+                if (item1 && item2) {
+                    const h1 = item1.offsetHeight;
+                    const h2 = item2.offsetHeight;
+                    const maxH = Math.max(h1, h2);
+                    item1.style.minHeight = maxH + 'px';
+                    item2.style.minHeight = maxH + 'px';
+                }
+            }
+            
+            // Легкий визуальный сдвиг вниз для первого элемента во втором столбце
+            if (col2.length > 0 && col1.length > 0) {
+                col2[0].style.marginTop = '4px';
+            }
+        }
+
+        function checkListOverflow() {
+            if (state.layout !== 'list' || (state.currentTab === 'promo' && state.currentTab !== 'combined')) {
+                hideWarning();
+                return;
+            }
+
+            const container = document.querySelector('.menu-items-container');
+            if (!container) return;
+
+            let isTwoCols = controls.listTwoColumnsCheck.checked;
+            let hasOverflow = false;
+
+            // Сначала убираем старую подсветку
+            container.querySelectorAll('.overflow-highlight').forEach(el => el.classList.remove('overflow-highlight'));
+
+            // Исключаем авто-переключение в комбо-режиме, там мы просто отображаем выбранную в меню структуру.
+            if (state.currentTab !== 'combined') {
+                // Универсальная логика автоматического переключения колонок для ВСЕХ форматов
+                if (isTwoCols) {
+                    // Временно отключаем 2 колонки и сбрасываем высоты для правильного замера вместимости
+                    container.classList.remove('two-columns');
+                    const itemsForCheck = Array.from(container.querySelectorAll('.menu-item, .artboard-add-item'));
+                    itemsForCheck.forEach(el => {
+                        el.style.minHeight = 'auto';
+                        el.style.marginTop = '0px';
+                    });
+
+                    // Если всё прекрасно помещается в 1 столбец, переключаемся на 1 столбец
+                    if (container.scrollHeight <= Math.ceil(container.clientHeight) + 5) {
+                        controls.listTwoColumnsCheck.checked = false;
+                        render();
+                        return;
+                    }
+                    
+                    // Возвращаем как было
+                    container.classList.add('two-columns');
+                    alignListColumns(); 
+                } else {
+                    // Если сейчас 1 колонка, и контент переполнил холст вниз - включаем 2 колонки
+                    if (container.scrollHeight > Math.ceil(container.clientHeight) + 5) {
+                        controls.listTwoColumnsCheck.checked = true;
+                        render(); 
+                        return;
+                    }
+                }
+            }
+
+            // Подсвечиваем элементы, которые вылезли за пределы (оранжевым)
+            const items = container.querySelectorAll('.menu-item, .artboard-add-item');
+            items.forEach(item => {
+                // Элемент ушел правее 2-й колонки (т.е. в 3-ю) ИЛИ обрезался снизу
+                const isOutRight = item.offsetLeft >= container.clientWidth;
+                const isOutBottom = item.offsetTop + item.offsetHeight > container.offsetHeight + 10;
+                
+                if (isOutRight || isOutBottom) {
+                    item.classList.add('overflow-highlight');
+                    hasOverflow = true;
+                }
+            });
+
+            if (hasOverflow) {
+                showWarning('Некоторые пункты меню не помещаются на холст.<br>Уменьшите количество или размер шрифта.');
+            } else {
+                hideWarning();
+            }
+        }
+
+        const getEl = (id) => document.getElementById(id);
+        const controls = {
+            sidebarBtns: document.querySelectorAll('.tool-btn'),
+            settingsPanel: getEl('settings-panel'),
+            closeSettings: getEl('close-settings'),
+            panelTitle: getEl('panel-title'),
+            settingsSections: document.querySelectorAll('.settings-section'),
+            modeTabs: document.querySelectorAll('input[name="view-tab"]'),
+            
+            menuOnlySettings: document.querySelectorAll('.menu-only-settings'),
+            promoOnlySettings: document.querySelectorAll('.promo-only-settings'),
+            comboOnlySettings: document.querySelectorAll('.combo-only-settings'),
+            
+            fileInput: getEl('file-input'),
+            menuDropArea: getEl('menu-drop-area'),
+            menuFileInfo: getEl('menu-file-info'),
+            layoutButtons: getEl('layout-buttons'),
+            showDescCheck: getEl('show-description-checkbox'),
+            showDateCheck: getEl('show-date-checkbox'),
+            showSmlPricesCheck: getEl('show-sml-prices-checkbox'),
+            menuBgPicker: getEl('menu-bg-color-picker'),
+            cellBgColorPicker: getEl('cell-bg-color-picker'),
+            gridColorItems: document.querySelectorAll('.grid-color-item'),
+            categoryFont: getEl('category-font-select'),
+            categorySize: getEl('category-font-size'),
+            categoryColor: getEl('category-color-picker'),
+            itemFontLabel: getEl('item-font-label'),
+            itemFont: getEl('item-font-select'),
+            itemSize: getEl('item-font-size'),
+            itemColor: getEl('item-color-picker'),
+            descFont: getEl('desc-font-select'),
+            descSize: getEl('desc-font-size'),
+            descColor: getEl('desc-color-picker'),
+            priceFont: getEl('price-font-select'),
+            priceSize: getEl('price-font-size'),
+            priceColor: getEl('price-color-picker'),
+            gridGradientSlider: getEl('grid-gradient-slider'),
+            
+            promoTitleFont: getEl('promo-title-font-select'),
+            promoTitleSize: getEl('promo-title-size'),
+            promoTitleColor: getEl('promo-title-color-picker'),
+            promoTextFont: getEl('promo-text-font-select'),
+            promoTextSize: getEl('promo-text-size'),
+            promoTextColor: getEl('promo-text-color-picker'),
+            promoCommentFont: getEl('promo-comment-font-select'),
+            promoCommentSize: getEl('promo-comment-size'),
+            promoCommentColor: getEl('promo-comment-color-picker'),
+            promoPriceFont: getEl('promo-price-font-select'),
+            promoPriceSize: getEl('promo-price-size'),
+            promoPriceColor: getEl('promo-price-color-picker'),
+            promoDiscountSlider: getEl('promo-discount-slider'),
+            promoDiscountValue: getEl('promo-discount-value'),
+            discountColor: getEl('discount-color-picker'),
+            discountBgColor: getEl('discount-bg-color-picker'),
+            promoIconColorPicker: getEl('promo-icon-color-picker'),
+            iconBtns: document.querySelectorAll('.icon-btn'),
+            customPromoImgUpload: getEl('custom-promo-img-upload'),
+            
+            promoBgType: getEl('promo-bg-type-select'),
+            bgColorContainer: getEl('bg-color-container'),
+            bgImageContainer: getEl('bg-image-container'),
+            promoBgUpload: getEl('promo-background-upload'),
+            bgColorPicker: getEl('bg-color-picker'),
+            gridPhotoUpload: getEl('grid-photo-upload'),
+            
+            artboardScroll: getEl('artboard-scroll'),
+            zoomWrapper: getEl('zoom-wrapper'),
+            zoomInBtn: getEl('zoom-in-btn'),
+            zoomOutBtn: getEl('zoom-out-btn'),
+            zoomLevelText: getEl('zoom-level-text'),
+            exportContainer: getEl('export-container'),
+            
+            menuPreview: getEl('menu-preview'),
+            downloadPngBtn: getEl('download-png-btn'),
+            downloadMp4Btn: getEl('download-mp4-btn'),
+            loadingOverlay: getEl('loading-overlay'),
+            loadingText: getEl('loading-text'),
+            
+            aspectRatioModal: getEl('aspect-ratio-modal'),
+            aspectRatioBtns: document.querySelectorAll('.aspect-ratio-btn'),
+            confirmAspectRatio: getEl('confirm-aspect-ratio'),
+            formatPanelBtns: document.getElementById('format-panel-buttons'),
+            
+            mp4Modal: getEl('mp4-modal'),
+            mp4Filename: getEl('mp4-filename'),
+            mp4Duration: getEl('mp4-duration'),
+            mp4DurationDisplay: getEl('mp4-duration-display'),
+            cancelMp4: getEl('cancel-mp4'),
+            saveMp4: getEl('save-mp4'),
+            toggleUpload: getEl('toggle-upload'),
+            toggleManual: getEl('toggle-manual'),
+            uploadModeContent: getEl('upload-mode-content'),
+            manualModeContent: getEl('manual-mode-content'),
+            manualItemList: getEl('manual-item-list'),
+            addManualItemBtn: getEl('add-manual-item-btn'),
+            exportExcelBtn: getEl('export-excel-btn'),
+            menuBgTypeSelect: getEl('menu-bg-type-select'),
+            menuBgImageContainer: getEl('menu-bg-image-container'),
+            menuBgUpload: getEl('menu-background-upload'),
+            
+            infoBtnSidebar: getEl('info-btn-sidebar'),
+            infoModal: getEl('info-modal'),
+            closeInfoModal: getEl('close-info-modal'),
+            
+            promoShowPriceCheck: getEl('promo-show-price-checkbox'),
+            promoShowSmlPricesCheck: getEl('promo-show-sml-prices-checkbox'),
+            
+            promoTextAlignBtns: document.querySelectorAll('.promo-text-align-btn'),
+            
+            listTwoColumnsCheck: getEl('list-two-columns-checkbox'),
+            listOnlySettings: document.querySelectorAll('.list-only-settings'),
+            currencySelect: getEl('currency-select')
+        };
+
+        let state = {
+            currentTab: 'menu',
+            comboSubTab: 'menu', // 'menu' или 'promo' - для управления панелями в режиме Комбо
+            layout: 'grid',
+            excelData: [],
+            promoTitle: 'Лавандовый раф+круассан', promoText: 'Супер предложение для первых клиетов.', promoPrice: '320',
+            promoPriceS: '80', promoPriceM: '100', promoPriceL: '120', promoVolumeS: 'S', promoVolumeM: 'M', promoVolumeL: 'L',
+            promoComment: 'Акция действеут только для первых 20 посетителей в устренние часы с 10:00 — 11:00.',
+            promoIcons: { vegan: false, glutenfree: false, hot: false, new: false, halal: false },
+            loadedIcons: {},
+            customPromoImages: [],
+            promoBgImage: 'images/rfc.webp', menuBgImage: 'images/4cback.webp', 
+            gridImages: {
+                0: 'images/lattecorn.webp',
+                1: 'images/lattecaramel.webp',
+                2: 'images/lattemalin.webp',
+                3: 'images/testcard.webp'
+            }, 
+            imageTransforms: {}, currentGridTarget: null,
+            aspectRatio: '16/9', exportWidth: 1920, exportHeight: 1080, displayDate: '', currency: '₽',
+            isExporting: false,
+            currentZoom: 1
+        };
+
+        let activeResizable = { element: null, mode: null, handle: null, key: null, startX: 0, startY: 0, startSize: 100, startPosX: 50, startPosY: 50, startWidth: 0, isText: false };
+
+        let isPanningBoard = false;
+        let panStart = { x: 0, y: 0, scrollL: 0, scrollT: 0 };
+        let dragStartIndex = -1;
+
+        function formatDate(date) { return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`; }
+        function getContrastColor(hexcolor) {
+            if (!hexcolor) return '#000000';
+            if (hexcolor.startsWith('#')) hexcolor = hexcolor.slice(1);
+            if (hexcolor.length === 3) hexcolor = hexcolor.split('').map(hex => hex + hex).join('');
+            const r = parseInt(hexcolor.substring(0, 2), 16), g = parseInt(hexcolor.substring(2, 4), 16), b = parseInt(hexcolor.substring(4, 6), 16);
+            return (((r * 299) + (g * 587) + (b * 114)) / 1000 >= 128) ? '#1A1D1F' : '#FFFFFF';
+        }
+
+        function createDefaultMenuData() {
+            if(state.excelData.length === 0) {
+                state.excelData = [
+                    { name: 'Латте-попкорн', description: 'эспрессо, сливки, попкорн сироп, попкорн', price: '400', category: 'Кофе', S: '150', M: '200', L: '250', volumeS: 'S', volumeM: 'M', volumeL: 'L', isPlaceholder: true },
+                    { name: 'Латте-карамель', description: 'эспрессо, молоко, карамельный сироп', price: '400', category: 'Кофе', S: '', M: '', L: '', volumeS: 'S', volumeM: 'M', volumeL: 'L', isPlaceholder: true },
+                    { name: 'Латте-малина', description: 'эспрессо, молоко, малиновый сироп', price: '400', category: 'Кофе', S: '', M: '', L: '', volumeS: 'S', volumeM: 'M', volumeL: 'L', isPlaceholder: true },
+                    { name: 'Название блюда', description: 'Описание блюда', price: '400', category: 'Кофе', S: '', M: '', L: '', volumeS: 'S', volumeM: 'M', volumeL: 'L', isPlaceholder: true }
+                ];
+            }
+        }
+
+        function openSettingsPanel(targetId, titleText) {
+            controls.settingsPanel.classList.remove('collapsed');
+            controls.settingsSections.forEach(sec => sec.classList.remove('active'));
+            getEl(targetId).classList.add('active');
+            
+            if (state.currentTab === 'combined' && targetId === 'panel-content') {
+                controls.panelTitle.textContent = "Комбо";
+            } else {
+                controls.panelTitle.textContent = titleText;
+            }
+            
+            controls.sidebarBtns.forEach(b => b.classList.remove('active'));
+            document.querySelector(`.tool-btn[data-target="${targetId}"]`)?.classList.add('active');
+        }
+
+        controls.sidebarBtns.forEach(btn => {
+            if(btn.id === 'info-btn-sidebar' || btn.classList.contains('disabled')) return;
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.target;
+                if(btn.classList.contains('active') && !controls.settingsPanel.classList.contains('collapsed')){
+                    controls.settingsPanel.classList.add('collapsed');
+                    btn.classList.remove('active');
+                } else {
+                    openSettingsPanel(target, btn.querySelector('span').textContent);
+                }
+            });
+        });
+
+        controls.closeSettings.addEventListener('click', () => {
+            controls.settingsPanel.classList.add('collapsed');
+            controls.sidebarBtns.forEach(b => b.classList.remove('active'));
+        });
+
+        controls.infoBtnSidebar.addEventListener('click', () => { controls.infoModal.style.display = 'flex'; });
+        controls.closeInfoModal.addEventListener('click', () => { controls.infoModal.style.display = 'none'; });
+
+        // Новая функция для контроля видимости всех панелей и суб-вкладок в зависимости от режима
+        function updateSettingsVisibility() {
+            const isCombo = state.currentTab === 'combined';
+            const activeSubTab = state.comboSubTab || 'menu';
+
+            // Показываем переключатели "Меню/Акция" только в комбо-режиме внутри Структуры и Оформления
+            document.querySelectorAll('.combo-sub-tabs').forEach(el => {
+                el.style.display = isCombo ? 'flex' : 'none';
+            });
+            // Синхронизируем состояние кнопок переключателя
+            document.querySelectorAll('.combo-sub-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.target === activeSubTab);
+            });
+
+            if (isCombo) {
+                // Во вкладке Содержимое (panel-content) оставляем только текстовую заглушку комбо
+                const contentPanel = document.getElementById('panel-content');
+                if (contentPanel) {
+                    contentPanel.querySelectorAll('.menu-only-settings, .promo-only-settings').forEach(el => el.style.display = 'none');
+                    contentPanel.querySelectorAll('.combo-only-settings').forEach(el => el.style.display = 'block');
+                }
+
+                // Во вкладках Структура и Оформление переключаем контент в зависимости от выбранного суб-таба
+                ['panel-layout', 'panel-text'].forEach(panelId => {
+                    const panel = document.getElementById(panelId);
+                    if(panel) {
+                        panel.querySelectorAll('.menu-only-settings').forEach(el => el.style.display = activeSubTab === 'menu' ? 'block' : 'none');
+                        panel.querySelectorAll('.promo-only-settings').forEach(el => el.style.display = activeSubTab === 'promo' ? 'block' : 'none');
+                    }
+                });
+
+                // Снимаем блокировку с кнопок боковой панели, чтобы в комбо режиме можно было всё править
+                const layoutBtn = document.querySelector('.tool-btn[data-target="panel-layout"]');
+                const textBtn = document.querySelector('.tool-btn[data-target="panel-text"]');
+                if (layoutBtn) layoutBtn.classList.remove('disabled');
+                if (textBtn) textBtn.classList.remove('disabled');
+                
+                // Следим чтобы Title панели не сбивался
+                const activeBtn = document.querySelector('.tool-btn.active');
+                if(activeBtn && activeBtn.dataset.target === 'panel-content') {
+                    controls.panelTitle.textContent = "Комбо";
+                }
+            } else {
+                // Обычный режим - всё как раньше
+                const showMenu = state.currentTab === 'menu';
+                const showPromo = state.currentTab === 'promo';
+
+                document.querySelectorAll('.menu-only-settings').forEach(el => el.style.display = showMenu ? 'block' : 'none');
+                document.querySelectorAll('.promo-only-settings').forEach(el => el.style.display = showPromo ? 'block' : 'none');
+                document.querySelectorAll('.combo-only-settings').forEach(el => el.style.display = 'none');
+
+                const layoutBtn = document.querySelector('.tool-btn[data-target="panel-layout"]');
+                const textBtn = document.querySelector('.tool-btn[data-target="panel-text"]');
+                if (layoutBtn) layoutBtn.classList.remove('disabled');
+                if (textBtn) textBtn.classList.remove('disabled');
+
+                const activeBtn = document.querySelector('.tool-btn.active');
+                if(activeBtn) controls.panelTitle.textContent = activeBtn.querySelector('span').textContent;
+            }
+
+            // Доп. проверка: показываем "Список в 2 столбца" только если активна вкладка Меню и Макет = Список
+            const isList = state.layout === 'list';
+            const showListSettings = isList && (!isCombo || activeSubTab === 'menu') && (state.currentTab === 'menu' || isCombo);
+            controls.listOnlySettings.forEach(el => el.style.display = showListSettings ? 'flex' : 'none');
+
+            updateGridColorVisibility();
+        }
+
+        controls.modeTabs.forEach(tab => {
+            tab.addEventListener('change', (e) => {
+                state.currentTab = e.target.value;
+                updateSettingsVisibility();
+                render();
+            });
+        });
+
+        // Слушатели для суб-переключателей в комбо-режиме
+        document.querySelectorAll('.combo-sub-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                state.comboSubTab = e.target.dataset.target;
+                updateSettingsVisibility();
+            });
+        });
+
+        function setResolution(btn) {
+            controls.aspectRatioBtns.forEach(b => b.classList.remove('active')); 
+            const ratio = btn.dataset.ratio;
+            document.querySelectorAll(`.aspect-ratio-btn[data-ratio="${ratio}"]`).forEach(b => b.classList.add('active'));
+            
+            state.aspectRatio = ratio; 
+            state.exportWidth = parseInt(btn.dataset.width); 
+            state.exportHeight = parseInt(btn.dataset.height);
+            updatePreviewAspectRatio();
+
+            if (ratio === '9/16') {
+                controls.exportContainer.classList.add('is-vertical');
+            } else {
+                controls.exportContainer.classList.remove('is-vertical');
+            }
+
+            render();
+            setTimeout(() => { fitToScreen(); }, 50);
+        }
+
+        function init() {
+            state.displayDate = formatDate(new Date());
+            setupEventListeners();
+            const initialActiveBtn = document.querySelector('.aspect-ratio-btn.active');
+            if (initialActiveBtn) { setResolution(initialActiveBtn); }
+            createDefaultMenuData();
+            renderManualEditor();
+            updateGridColorVisibility();
+            updateMenuBgControlsVisibility();
+            updateSettingsVisibility();
+            
+            render();
+            setTimeout(() => { fitToScreen(); }, 100);
+        }
+
+        function fitToScreen() {
+            const wrap = controls.artboardScroll;
+            const availableWidth = wrap.clientWidth - 120;
+            const availableHeight = wrap.clientHeight - 120;
+            const scaleX = availableWidth / state.exportWidth;
+            const scaleY = availableHeight / state.exportHeight;
+            let targetZoom = Math.min(scaleX, scaleY); 
+            state.currentZoom = Math.max(0.1, Math.min(targetZoom, 2));
+            applyZoom();
+            
+            wrap.scrollTop = (controls.zoomWrapper.offsetHeight - wrap.clientHeight) / 2;
+            wrap.scrollLeft = (controls.zoomWrapper.offsetWidth - wrap.clientWidth) / 2;
+        }
+        
+        function applyZoom() {
+            controls.zoomLevelText.textContent = Math.round(state.currentZoom * 100) + '%';
+            controls.exportContainer.style.setProperty('--zoom', state.currentZoom);
+            
+            const w = state.exportWidth * state.currentZoom;
+            const h = state.exportHeight * state.currentZoom;
+            controls.zoomWrapper.style.width = `${w}px`;
+            controls.zoomWrapper.style.height = `${h}px`;
+        }
+        
+        function updateZoom(delta) {
+            if (delta !== undefined) {
+                state.currentZoom += delta;
+                state.currentZoom = Math.max(0.1, Math.min(state.currentZoom, 4));
+            }
+            applyZoom();
+        }
+
+        // Вспомогательная функция для корректного сдвига данных (в т.ч. картинок) после удаления позиции
+        function shiftDataAfterDeletion(deletedIndex) {
+            const tempImages = [];
+            const tempTransforms = [];
+            const maxLen = state.excelData.length + 1; // Так как элемент уже удален из массива
+            for (let i = 0; i < maxLen; i++) {
+                tempImages[i] = state.gridImages[i];
+                tempTransforms[i] = state.imageTransforms[`grid-${i}`];
+            }
+            tempImages.splice(deletedIndex, 1);
+            tempTransforms.splice(deletedIndex, 1);
+
+            const newGridImages = {};
+            const newImageTransforms = {};
+            
+            // Копируем обратно не-гридовые трансформации
+            Object.keys(state.imageTransforms).forEach(k => {
+                if (!k.startsWith('grid-')) {
+                    newImageTransforms[k] = state.imageTransforms[k];
+                }
+            });
+            
+            // Записываем обновленные гриды
+            for (let i = 0; i < tempImages.length; i++) {
+                if (tempImages[i] !== undefined) newGridImages[i] = tempImages[i];
+                if (tempTransforms[i] !== undefined) newImageTransforms[`grid-${i}`] = tempTransforms[i];
+            }
+            state.gridImages = newGridImages;
+            state.imageTransforms = newImageTransforms;
+        }
+
+        function setupEventListeners() {
+            document.body.addEventListener('input', (e) => {
+                const target = e.target;
+                const priceFields = ['price', 'promoPrice', 'S', 'M', 'L', 'promoPriceS', 'promoPriceM', 'promoPriceL'];
+                if (priceFields.includes(target.dataset.field) && target.isContentEditable) {
+                    let text = target.innerText;
+                    let cleanText = text.replace(/[^\d.,]/g, '');
+                    if (text !== cleanText) {
+                        target.innerText = cleanText;
+                        const range = document.createRange();
+                        const sel = window.getSelection();
+                        range.selectNodeContents(target);
+                        range.collapse(false);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                }
+            });
+
+            controls.layoutButtons.addEventListener('click', (e) => {
+                const btn = e.target.closest('.layout-btn');
+                if (!btn || btn.classList.contains('aspect-ratio-btn') || btn.classList.contains('promo-text-align-btn') || btn.classList.contains('icon-btn')) return;
+                state.layout = btn.dataset.layout;
+                document.querySelectorAll('#layout-buttons .layout-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                updateSettingsVisibility();
+                render();
+            });
+            
+            controls.currencySelect.addEventListener('change', (e) => {
+                state.currency = e.target.value;
+                render();
+            });
+            
+            controls.listTwoColumnsCheck.addEventListener('change', render);
+            
+            controls.promoTextAlignBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const b = e.target.closest('.promo-text-align-btn');
+                    controls.promoTextAlignBtns.forEach(x => x.classList.remove('active'));
+                    b.classList.add('active');
+                    render();
+                });
+            });
+
+            controls.iconBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const b = e.target.closest('.icon-btn');
+                    const icon = b.dataset.icon;
+                    state.promoIcons[icon] = !state.promoIcons[icon];
+                    
+                    if (state.promoIcons[icon] && !state.loadedIcons[icon]) {
+                        fetch(`images/${icon}.svg`)
+                            .then(res => res.text())
+                            .then(text => {
+                                state.loadedIcons[icon] = text;
+                                render();
+                            })
+                            .catch(err => {
+                                console.error('Ошибка загрузки SVG', err);
+                                state.loadedIcons[icon] = `<img src="images/${icon}.svg" style="width:100%; height:100%; object-fit:contain; pointer-events:none;">`;
+                                render();
+                            });
+                    }
+                    
+                    b.classList.toggle('active', state.promoIcons[icon]);
+                    render();
+                });
+            });
+
+            if (controls.customPromoImgUpload) {
+                controls.customPromoImgUpload.addEventListener('change', e => {
+                    if(e.target.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = ev => {
+                            const id = 'promo-custom-' + Date.now();
+                            state.customPromoImages.push({ id: id, url: ev.target.result });
+                            state.imageTransforms[id] = { size: 150, x: 0, y: 0 };
+                            render();
+                        };
+                        reader.readAsDataURL(e.target.files[0]);
+                        e.target.value = '';
+                    }
+                });
+            }
+
+            document.querySelectorAll('.settings-panel-container input, .settings-panel-container select').forEach(el => {
+                if (el.type !== 'file' && el.id !== 'file-input' && el.id !== 'currency-select') {
+                    el.addEventListener('input', render); 
+                    el.addEventListener('change', render);
+                }
+            });
+
+            controls.promoBgType.addEventListener('change', () => {
+                controls.bgColorContainer.style.display = controls.promoBgType.value === 'color' ? 'block' : 'none';
+                controls.bgImageContainer.style.display = controls.promoBgType.value === 'image' ? 'block' : 'none';
+                render();
+            });
+            controls.promoBgUpload.addEventListener('change', e => {
+                if(e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = ev => { state.promoBgImage = ev.target.result; render(); };
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+            });
+
+            controls.gridPhotoUpload.addEventListener('change', e => {
+                if(e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                        if (state.currentGridTarget !== null && state.currentGridTarget !== undefined) {
+                            state.gridImages[state.currentGridTarget] = ev.target.result;
+                            render();
+                        }
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                    e.target.value = ''; 
+                }
+            });
+            
+            controls.downloadPngBtn.addEventListener('click', downloadAsPNG);
+            controls.downloadMp4Btn.addEventListener('click', () => { controls.mp4Filename.value = generateFilename(); controls.mp4Modal.style.display = 'flex'; });
+            
+            controls.zoomInBtn.addEventListener('click', () => updateZoom(0.15));
+            controls.zoomOutBtn.addEventListener('click', () => updateZoom(-0.15));
+            
+            controls.artboardScroll.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                updateZoom(e.deltaY > 0 ? -0.1 : 0.1);
+            }, { passive: false });
+
+            controls.artboardScroll.addEventListener('mousedown', e => {
+                if (e.button === 1) { 
+                    e.preventDefault();
+                    isPanningBoard = true;
+                    controls.artboardScroll.style.cursor = 'grabbing';
+                    panStart.x = e.clientX;
+                    panStart.y = e.clientY;
+                    panStart.scrollL = controls.artboardScroll.scrollLeft;
+                    panStart.scrollT = controls.artboardScroll.scrollTop;
+                }
+            });
+            window.addEventListener('mousemove', e => {
+                if (isPanningBoard) {
+                    e.preventDefault();
+                    const dx = e.clientX - panStart.x;
+                    const dy = e.clientY - panStart.y;
+                    controls.artboardScroll.scrollLeft = panStart.scrollL - dx;
+                    controls.artboardScroll.scrollTop = panStart.scrollT - dy;
+                }
+            });
+            window.addEventListener('mouseup', (e) => {
+                if (isPanningBoard || e.button === 1) {
+                    isPanningBoard = false;
+                    controls.artboardScroll.style.cursor = '';
+                }
+            });
+
+            controls.menuPreview.addEventListener('click', e => {
+                // Удаление блюда целиком из списка/сетки по кнопке с крестиком
+                const deleteItemCanvasBtn = e.target.closest('.delete-item-canvas-btn');
+                if (deleteItemCanvasBtn) {
+                    e.preventDefault(); e.stopPropagation();
+                    const index = parseInt(deleteItemCanvasBtn.dataset.index);
+                    if (!isNaN(index)) {
+                        state.excelData.splice(index, 1);
+                        shiftDataAfterDeletion(index);
+                        renderManualEditor();
+                        render();
+                    }
+                    return;
+                }
+
+                const deleteIconBtn = e.target.closest('.delete-icon-btn');
+                if (deleteIconBtn) {
+                    e.preventDefault(); e.stopPropagation();
+                    const icon = deleteIconBtn.dataset.icon;
+                    state.promoIcons[icon] = false;
+                    const btn = document.querySelector(`.icon-btn[data-icon="${icon}"]`);
+                    if(btn) btn.classList.remove('active');
+                    render();
+                    return;
+                }
+
+                const deleteBtn = e.target.closest('.delete-photo-btn');
+                if (deleteBtn) {
+                    e.preventDefault(); e.stopPropagation();
+                    
+                    const index = deleteBtn.dataset.index;
+                    if (index !== undefined) {
+                        delete state.gridImages[index];
+                        delete state.imageTransforms[`grid-${index}`];
+                        render();
+                        return;
+                    }
+                    
+                    const customImgId = deleteBtn.dataset.customImgId;
+                    if (customImgId) {
+                        state.customPromoImages = state.customPromoImages.filter(img => img.id !== customImgId);
+                        delete state.imageTransforms[customImgId];
+                        render();
+                        return;
+                    }
+                }
+            });
+
+            controls.menuPreview.addEventListener('click', e => {
+                const photoContainer = e.target.closest('.item-photo-container');
+                if (photoContainer && !photoContainer.querySelector('.item-photo')) {
+                    state.currentGridTarget = photoContainer.dataset.index;
+                    controls.gridPhotoUpload.click();
+                }
+                const addCard = e.target.closest('.artboard-add-item');
+                if(addCard) addManualItem();
+            });
+
+            controls.menuPreview.addEventListener('blur', handleInlineEdit, true);
+
+            // Обработчик удаления выделенного элемента с клавиатуры (Delete / Backspace)
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    // Игнорируем, если фокус находится в поле ввода или текстовом блоке
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+                        return;
+                    }
+                    
+                    const selectedEl = document.querySelector('.resizable-container.selected, .selectable-item-block.selected');
+                    if (!selectedEl) return;
+                    
+                    e.preventDefault();
+                    
+                    // Удаление карточки меню / позиции списка
+                    if (selectedEl.classList.contains('selectable-item-block')) {
+                        const index = parseInt(selectedEl.dataset.index);
+                        if (!isNaN(index)) {
+                            state.excelData.splice(index, 1);
+                            shiftDataAfterDeletion(index);
+                            renderManualEditor();
+                            render();
+                        }
+                    }
+                    // Удаление фото в карточке сетки
+                    else if (selectedEl.classList.contains('item-photo-container')) {
+                        const index = selectedEl.dataset.index;
+                        if (index !== undefined && state.gridImages[index]) {
+                            delete state.gridImages[index];
+                            delete state.imageTransforms[`grid-${index}`];
+                            render();
+                        }
+                    } 
+                    // Удаление иконки
+                    else if (selectedEl.classList.contains('promo-icon')) {
+                        const btn = selectedEl.querySelector('.delete-icon-btn');
+                        if (btn) {
+                            const icon = btn.dataset.icon;
+                            state.promoIcons[icon] = false;
+                            const iconBtn = document.querySelector(`.icon-btn[data-icon="${icon}"]`);
+                            if (iconBtn) iconBtn.classList.remove('active');
+                            render();
+                        }
+                    } 
+                    // Удаление загруженной картинки в акции
+                    else if (selectedEl.classList.contains('promo-custom-img')) {
+                        const btn = selectedEl.querySelector('.delete-photo-btn');
+                        if (btn) {
+                            const customImgId = btn.dataset.customImgId;
+                            state.customPromoImages = state.customPromoImages.filter(img => img.id !== customImgId);
+                            delete state.imageTransforms[customImgId];
+                            render();
+                        }
+                    } 
+                    // Сброс фона акции на цвет по умолчанию
+                    else if (selectedEl.dataset.key === 'promo') {
+                        controls.promoBgType.value = 'color';
+                        controls.bgColorContainer.style.display = 'block';
+                        controls.bgImageContainer.style.display = 'none';
+                        render();
+                    } 
+                    // Сброс фона меню на цвет по умолчанию
+                    else if (selectedEl.dataset.key === 'menu-bg') {
+                        controls.menuBgTypeSelect.value = 'color';
+                        controls.menuBgImageContainer.style.display = 'none';
+                        render();
+                    }
+                }
+            });
+
+            controls.aspectRatioBtns.forEach(btn => btn.addEventListener('click', () => { setResolution(btn); }));
+            
+            controls.confirmAspectRatio.addEventListener('click', () => { controls.aspectRatioModal.style.display = 'none'; });
+            controls.cancelMp4.addEventListener('click', () => controls.mp4Modal.style.display = 'none');
+            controls.saveMp4.addEventListener('click', downloadAsMP4);
+
+            controls.mp4Duration.addEventListener('input', () => {
+                let val = parseInt(controls.mp4Duration.value) || 0;
+                if (val >= 60) {
+                    const mins = Math.floor(val / 60);
+                    const secs = val % 60;
+                    controls.mp4DurationDisplay.textContent = `${mins} мин. ${secs > 0 ? secs + ' сек.' : '00 сек.'}`;
+                } else {
+                    controls.mp4DurationDisplay.textContent = `${val} сек.`;
+                }
+            });
+
+            controls.toggleUpload.addEventListener('click', switchInputMode);
+            controls.toggleManual.addEventListener('click', switchInputMode);
+            controls.exportExcelBtn.addEventListener('click', exportToExcel); 
+            controls.addManualItemBtn.addEventListener('click', addManualItem);
+            
+            // В боковом меню тоже используем shiftDataAfterDeletion для идеальной синхронизации
+            controls.manualItemList.addEventListener('click', e => {
+                const deleteBtn = e.target.closest('.delete-item-btn');
+                if(deleteBtn){
+                    const idx = parseInt(deleteBtn.dataset.index);
+                    state.excelData.splice(idx, 1);
+                    shiftDataAfterDeletion(idx);
+                    render(); renderManualEditor();
+                }
+            });
+
+            const list = controls.manualItemList;
+            list.addEventListener('dragstart', e => {
+                const target = e.target.closest('.manual-item');
+                if (!target) return;
+                dragStartIndex = Array.from(list.children).indexOf(target);
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => target.classList.add('dragging'), 0);
+            });
+            list.addEventListener('dragend', e => {
+                const target = e.target.closest('.manual-item');
+                if (target) target.classList.remove('dragging');
+                list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            });
+            list.addEventListener('dragover', e => {
+                e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+                const target = e.target.closest('.manual-item');
+                if (target) {
+                    list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                    target.classList.add('drag-over');
+                }
+            });
+            list.addEventListener('dragleave', e => {
+                const target = e.target.closest('.manual-item');
+                if (target && !target.contains(e.relatedTarget)) target.classList.remove('drag-over');
+            });
+            list.addEventListener('drop', e => {
+                e.preventDefault();
+                const target = e.target.closest('.manual-item');
+                if (!target) { list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); return; }
+                
+                const dragEndIndex = Array.from(list.children).indexOf(target);
+                if (dragStartIndex !== -1 && dragStartIndex !== dragEndIndex) {
+                    const [draggedExcelItem] = state.excelData.splice(dragStartIndex, 1);
+                    state.excelData.splice(dragEndIndex, 0, draggedExcelItem);
+
+                    const tempImages = [];
+                    const tempTransforms = [];
+                    const maxLen = state.excelData.length;
+                    for (let i = 0; i < maxLen; i++) {
+                        tempImages[i] = state.gridImages[i];
+                        tempTransforms[i] = state.imageTransforms[`grid-${i}`];
+                    }
+                    const [movedImage] = tempImages.splice(dragStartIndex, 1);
+                    tempImages.splice(dragEndIndex, 0, movedImage);
+                    const [movedTransform] = tempTransforms.splice(dragStartIndex, 1);
+                    tempTransforms.splice(dragEndIndex, 0, movedTransform);
+
+                    const newGridImages = {};
+                    const newImageTransforms = {};
+                    if (state.imageTransforms['promo']) newImageTransforms['promo'] = state.imageTransforms['promo'];
+                    if (state.imageTransforms['menu-bg']) newImageTransforms['menu-bg'] = state.imageTransforms['menu-bg'];
+                    if (state.imageTransforms['promo-title']) newImageTransforms['promo-title'] = state.imageTransforms['promo-title'];
+                    if (state.imageTransforms['promo-text']) newImageTransforms['promo-text'] = state.imageTransforms['promo-text'];
+                    if (state.imageTransforms['promo-price']) newImageTransforms['promo-price'] = state.imageTransforms['promo-price'];
+                    if (state.imageTransforms['promo-comment']) newImageTransforms['promo-comment'] = state.imageTransforms['promo-comment'];
+                    
+                    Object.keys(state.imageTransforms).forEach(k => {
+                        if (k.startsWith('promo-icon-') || k.startsWith('promo-custom-')) {
+                            newImageTransforms[k] = state.imageTransforms[k];
+                        }
+                    });
+                    
+                    for (let i = 0; i < maxLen; i++) {
+                        if (tempImages[i] !== undefined) newGridImages[i] = tempImages[i];
+                        if (tempTransforms[i] !== undefined) newImageTransforms[`grid-${i}`] = tempTransforms[i];
+                    }
+                    state.gridImages = newGridImages;
+                    state.imageTransforms = newImageTransforms;
+
+                    renderManualEditor(); render();
+                }
+                list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                dragStartIndex = -1;
+            });
+
+            controls.menuBgTypeSelect.addEventListener('change', updateMenuBgControlsVisibility);
+            controls.menuBgUpload.addEventListener('change', e => {
+                if(e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = ev => { state.menuBgImage = ev.target.result; render(); };
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+            });
+
+            controls.promoShowSmlPricesCheck.addEventListener('change', render);
+            controls.promoShowPriceCheck.addEventListener('change', render);
+
+            controls.menuPreview.addEventListener('mousedown', handlePreviewMouseDown);
+            document.addEventListener('mousemove', handleDocumentMouseMove);
+            document.addEventListener('mouseup', handleDocumentMouseUp);
+            
+            // Touch события для перетаскивания и масштабирования на мобильных устройствах
+            function handleTouchStart(e) {
+                if (e.touches && e.touches.length > 0) {
+                    e.clientX = e.touches[0].clientX;
+                    e.clientY = e.touches[0].clientY;
+                    handlePreviewMouseDown(e);
+                }
+            }
+            function handleTouchMove(e) {
+                if (activeResizable.element && e.touches && e.touches.length > 0) {
+                    e.preventDefault(); // Предотвращаем скроллинг страницы при перетаскивании
+                    e.clientX = e.touches[0].clientX;
+                    e.clientY = e.touches[0].clientY;
+                    handleDocumentMouseMove(e);
+                }
+            }
+            
+            controls.menuPreview.addEventListener('touchstart', handleTouchStart, {passive: false});
+            document.addEventListener('touchmove', handleTouchMove, {passive: false});
+            document.addEventListener('touchend', handleDocumentMouseUp);
+
+            setupDropArea();
+        }
+
+        function setupDropArea() {
+            const dropArea = controls.menuDropArea;
+            const fileInput = controls.fileInput;
+            const fileInfo = controls.menuFileInfo;
+
+            dropArea.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); dropArea.style.borderColor = 'var(--primary)'; });
+            dropArea.addEventListener('dragleave', e => { e.preventDefault(); e.stopPropagation(); dropArea.style.borderColor = '#444'; });
+            dropArea.addEventListener('drop', e => {
+                e.preventDefault(); e.stopPropagation(); dropArea.style.borderColor = '#444';
+                if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; handleFile(e.dataTransfer.files[0]); }
+            });
+            fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+            function handleFile(file) {
+                fileInfo.textContent = file.name;
+                if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                        
+                        const findValue = (obj, keys) => {
+                            for (const key of keys) {
+                                const objKey = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+                                if (objKey && obj[objKey] !== undefined) return obj[objKey];
+                            }
+                            return '';
+                        };
+                        state.excelData = jsonData.map(row => ({
+                            name: findValue(row, ['Название', 'Наименование', 'блюдо']), description: findValue(row, ['Описание', 'состав']),
+                            price: findValue(row, ['Цена', 'Стоимость', 'с ндс']), photo: row['Фото'] || '',
+                            category: (findValue(row, ['Категория', 'тип']) || 'Основное меню').trim(), 
+                            S: findValue(row, ['S', 'Цена S']), M: findValue(row, ['M', 'Цена M']), L: findValue(row, ['L', 'Цена L']),
+                            volumeS: findValue(row, ['Объем S', 'volumeS']) || 'S', volumeM: findValue(row, ['Объем M', 'volumeM']) || 'M', volumeL: findValue(row, ['Объем L', 'volumeL']) || 'L',
+                            isPlaceholder: false
+                        }));
+                        state.gridImages = {}; state.imageTransforms = {};
+                        render(); renderManualEditor();
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else if (file.name.endsWith('.txt')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const lines = e.target.result.split('\n');
+                        let currentCategory = 'Основное меню';
+                        state.excelData = lines.map(line => {
+                            line = line.trim();
+                            if (!line) return null;
+                            if (line.startsWith('#') || line.startsWith('*') || line.endsWith(':')) {
+                                currentCategory = line.replace(/[#*:]/g, '').trim(); return null;
+                            }
+                            const parts = line.split(' - ');
+                            return { name: parts[0]?.trim() || '', description: parts[1]?.trim() || '', price: (parts[2]?.match(/(\d+)/) || [])[1] || parts[2]?.trim() || '', category: currentCategory, S:'', M:'', L:'', isPlaceholder: false };
+                        }).filter(Boolean);
+                        state.gridImages = {}; state.imageTransforms = {};
+                        render(); renderManualEditor();
+                    };
+                    reader.readAsText(file);
+                }
+            }
+        }
+
+        function exportToExcel() {
+            if (state.excelData.length === 0) { alert('Нет данных для экспорта'); return; }
+            const wsData = state.excelData.map(item => ({
+                'Категория': item.category, 'Название': item.name, 'Описание': item.description,
+                'Стоимость': item.price, 
+                'Объем S': item.volumeS, 'Цена S': item.S, 
+                'Объем M': item.volumeM, 'Цена M': item.M, 
+                'Объем L': item.volumeL, 'Цена L': item.L
+            }));
+            const ws = XLSX.utils.json_to_sheet(wsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Меню");
+            XLSX.writeFile(wb, `${generateFilename()}.xlsx`);
+        }
+
+        function updatePreviewAspectRatio() { 
+            controls.exportContainer.style.setProperty('--export-width', state.exportWidth + 'px');
+            controls.exportContainer.style.setProperty('--export-height', state.exportHeight + 'px');
+        }
+        function updateGridColorVisibility() {
+            const show = state.layout.startsWith('grid');
+            controls.gridColorItems.forEach(item => { item.style.display = show ? 'block' : 'none'; });
+        }
+        function updateMenuBgControlsVisibility() { controls.menuBgImageContainer.style.display = controls.menuBgTypeSelect.value === 'image' ? 'block' : 'none'; render(); }
+
+        function switchInputMode(e) {
+            const mode = e.target.dataset.mode;
+            controls.toggleUpload.classList.toggle('active', mode === 'upload'); controls.toggleManual.classList.toggle('active', mode === 'manual');
+            controls.uploadModeContent.style.display = mode === 'upload' ? 'block' : 'none'; controls.manualModeContent.style.display = mode === 'manual' ? 'block' : 'none';
+        }
+
+        function addManualItem() {
+            // Убрали ограничение по лимиту (limit), чтобы в боковой панели элементы сохранялись бесконечно.
+            state.excelData.push({ name: 'Новое блюдо', description: 'Описание', price: '400', category: state.excelData[0]?.category || 'Кофе', S: '', M: '', L: '', volumeS: 'S', volumeM: 'M', volumeL: 'L', isPlaceholder: false });
+            renderManualEditor(); 
+            render();
+        }
+
+        function renderManualEditor() {
+            controls.manualItemList.innerHTML = state.excelData.map((item, index) => `
+                <div class="manual-item" draggable="true" data-index="${index}">
+                    <span class="manual-item-name">${item.name}</span>
+                    <div class="manual-item-actions">
+                        <button class="delete-item-btn" data-index="${index}" title="Удалить">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatPrice(price) { 
+            const parsed = parseFloat(String(price).replace(',','.'));
+            return isNaN(parsed) ? '0' : parsed.toFixed(0); 
+        }
+        
+        function generateFilename() {
+            let name = 'менюборд';
+            if (state.currentTab === 'promo') {
+                name = 'Акция-' + (state.promoTitle || '');
+            } else if (state.currentTab === 'menu') {
+                name = 'Меню-' + (state.excelData[0]?.category || 'Кофе');
+            } else if (state.currentTab === 'combined') {
+                name = 'Комбо ' + (state.excelData[0]?.category || 'Кофе') + '+ акция ' + (state.promoTitle || '');
+            }
+            return name.replace(/[/\\?%*:|"<>]/g, '-').trim() || 'менюборд';
+        }
+        
+        function handleInlineEdit(e) { 
+            const target = e.target; if(!target.dataset.field || target.classList.contains('is-placeholder')) return;
+            const field = target.dataset.field; 
+            let val = target.innerText.trim();
+            
+            const priceFields = ['price', 'promoPrice', 'S', 'M', 'L', 'promoPriceS', 'promoPriceM', 'promoPriceL'];
+            if (priceFields.includes(field)) {
+                val = val.replace(/[^\d.,]/g, '');
+                if (!val || val === '') val = '0';
+            }
+
+            if(field.startsWith('promo')) { state[field] = val; }
+            else if(field === 'displayDate') { state.displayDate = val; }
+            else if(target.dataset.index !== undefined) { state.excelData[target.dataset.index][field] = val; }
+            
+            render();
+        }
+
+        function getStyles() {
+            const alignBtn = document.querySelector('.promo-text-align-btn.active');
+            const align = alignBtn ? alignBtn.dataset.align : 'left';
+            let justify = 'flex-start';
+            let alignItemVal = 'flex-start';
+            if (align === 'center') { justify = 'center'; alignItemVal = 'center'; }
+            if (align === 'right') { justify = 'flex-end'; alignItemVal = 'flex-end'; }
+            
+            const gradOpacity = parseFloat(controls.gridGradientSlider.value) / 100;
+            const gridGradient = gradOpacity > 0 ? `linear-gradient(to right, rgba(0,0,0,${gradOpacity}) 0%, rgba(0,0,0,0) 100%)` : 'none';
+            
+            // Если включен режим КОМБО, автоматически уменьшаем все шрифты на 25%, чтобы контент влез в половинки
+            const isCombo = state.currentTab === 'combined';
+            const scale = isCombo ? 0.75 : 1;
+            
+            return {
+                '--menu-bg-color': controls.menuBgPicker.value, '--cell-bg-color': controls.cellBgColorPicker.value,
+                '--category-font-family': controls.categoryFont.value, 
+                '--category-font-size': (controls.categorySize.value * scale) + 'px', 
+                '--category-font-color': controls.categoryColor.value,
+                '--item-font-family': controls.itemFont.value, 
+                '--item-font-size': (controls.itemSize.value * scale) + 'px', 
+                '--item-font-color': controls.itemColor.value,
+                '--desc-font-family': controls.descFont.value, 
+                '--desc-font-size': (controls.descSize.value * scale) + 'px', 
+                '--desc-font-color': controls.descColor.value,
+                '--price-font-family': controls.priceFont.value, 
+                '--price-font-size': (controls.priceSize.value * scale) + 'px', 
+                '--price-font-color': controls.priceColor.value,
+                
+                '--promo-title-font-family': controls.promoTitleFont.value, 
+                '--promo-title-font-size': (controls.promoTitleSize.value * scale) + 'px', 
+                '--promo-title-font-color': controls.promoTitleColor.value,
+                '--promo-text-font-family': controls.promoTextFont.value, 
+                '--promo-text-font-size': (controls.promoTextSize.value * scale) + 'px', 
+                '--promo-text-font-color': controls.promoTextColor.value,
+                '--promo-comment-font-family': controls.promoCommentFont.value, 
+                '--promo-comment-font-size': (controls.promoCommentSize.value * scale) + 'px', 
+                '--promo-comment-font-color': controls.promoCommentColor.value,
+                '--promo-price-font-family': controls.promoPriceFont.value, 
+                '--promo-price-font-size': (controls.promoPriceSize.value * scale) + 'px', 
+                '--promo-price-font-color': controls.promoPriceColor.value,
+                
+                '--discount-font-color': controls.discountColor.value, '--discount-bg-color': controls.discountBgColor.value, 
+                '--promo-icon-color': controls.promoIconColorPicker ? controls.promoIconColorPicker.value : '#04C9B0',
+                
+                '--promo-text-align': align, '--promo-justify': justify, '--promo-align-items': alignItemVal,
+                '--date-contrast-color': getContrastColor(controls.menuBgPicker.value),
+                
+                // Переменные для пропорционального масштабирования отступов в комбо режиме
+                '--combo-gap': (70 * scale) + 'px',
+                '--combo-padding': (30 * scale) + 'px',
+                '--combo-promo-padding': (40 * scale) + 'px',
+                '--combo-grid-gap': (15 * scale) + 'px'
+            };
+        }
+
+        const getTransformStyle = (key) => {
+            const transform = state.imageTransforms[key] || { x: 0, y: 0 };
+            const isCombo = state.currentTab === 'combined';
+            const scale = isCombo ? 0.75 : 1;
+            
+            let style = `transform: translate(${transform.x}px, ${transform.y}px);`;
+            if (transform.width) {
+                // Если ширина задана вручную, тоже масштабируем ее
+                style += ` width: ${transform.width * scale}px; white-space: normal;`;
+            }
+            return style;
+        };
+
+        function renderMenuHTML(currentLayout) {
+            if (!state.excelData.length) return '';
+            const isList = currentLayout === 'list';
+            
+            const handlesHTML = ['tl', 'tr', 'bl', 'br'].map(h => `<div class="resize-handle ${h}" title="масштабировать"></div>`).join('');
+            
+            const dateHTML = controls.showDateCheck.checked ? `<div class="resizable-container no-pan" data-key="text-date" style="position:relative;"><div class="menu-date auto-contrast" contenteditable="true" data-field="displayDate">${state.displayDate}</div>${handlesHTML}</div>` : '';
+            
+            let headerHTML = !isList ? `<div class="menu-header"><div class="resizable-container no-pan" data-key="text-category" style="position:relative;"><div class="menu-grid-category-title" contenteditable="true" data-index="0" data-field="category">${state.excelData[0].category}</div>${handlesHTML}</div>${dateHTML}</div>` : '';
+            
+            let limit = Infinity;
+            if (currentLayout === 'grid') limit = 4;
+            else if (currentLayout === 'grid3x2') limit = 6;
+            else if (currentLayout === 'grid3x3') limit = 9;
+            else if (currentLayout === 'grid4x3') limit = 12;
+
+            const canAdd = state.excelData.length < limit;
+            
+            // В комбо-режиме кнопка Добавить теперь показывается и работает корректно
+            const showAddBtn = !state.isExporting && (isList || canAdd);
+            const addHtml = showAddBtn ? `<div class="artboard-add-item" title="добавить"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Добавить</span></div>` : '';
+
+            const cellBgColor = controls.cellBgColorPicker.value;
+            const gradOpacity = parseFloat(controls.gridGradientSlider.value) / 100;
+
+            const trashIconSVG = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+
+            if (isList) {
+                let itemsHTML = state.excelData.map((item, i) => {
+                    const deleteCanvasBtn = !state.isExporting ? `<button class="delete-item-canvas-btn" data-index="${i}" title="Удалить блюдо">${trashIconSVG}</button>` : '';
+                    
+                    const itemNameWrap = `<div class="resizable-container no-pan" data-key="text-name" style="position:relative; width:fit-content; max-width:100%;"><div class="item-name" contenteditable="true" data-index="${i}" data-field="name">${item.name}</div>${handlesHTML}</div>`;
+                    const itemDescWrap = controls.showDescCheck.checked ? `<div class="resizable-container no-pan" data-key="text-desc" style="position:relative; width:fit-content; max-width:100%;"><div class="item-description" contenteditable="true" data-index="${i}" data-field="description">${item.description}</div>${handlesHTML}</div>` : '';
+                    
+                    let itemPriceHTML = '';
+                    if (controls.showSmlPricesCheck.checked) {
+                        itemPriceHTML = `<div class="resizable-container no-pan" data-key="text-price" style="position:relative;">
+                            <div class="volume-price-container" style="flex-direction: row;">
+                                <div class="volume-price"><span contenteditable="true" data-index="${i}" data-field="volumeS">${item.volumeS}</span> <span contenteditable="true" data-index="${i}" data-field="S">${formatPrice(item.S)}</span> <span>${state.currency}</span></div>
+                                <div class="volume-price"><span contenteditable="true" data-index="${i}" data-field="volumeM">${item.volumeM}</span> <span contenteditable="true" data-index="${i}" data-field="M">${formatPrice(item.M)}</span> <span>${state.currency}</span></div>
+                                <div class="volume-price"><span contenteditable="true" data-index="${i}" data-field="volumeL">${item.volumeL}</span> <span contenteditable="true" data-index="${i}" data-field="L">${formatPrice(item.L)}</span> <span>${state.currency}</span></div>
+                            </div>
+                            ${handlesHTML}
+                        </div>`;
+                    } else {
+                        itemPriceHTML = `<div class="resizable-container no-pan" data-key="text-price" style="position:relative; width:fit-content;">
+                            <div class="item-price"><span contenteditable="true" data-index="${i}" data-field="price">${formatPrice(item.price)}</span> <span>${state.currency}</span></div>
+                            ${handlesHTML}
+                        </div>`;
+                    }
+                    
+                    return `<div class="menu-item selectable-item-block" data-index="${i}">${deleteCanvasBtn}<div class="item-content">${itemNameWrap}${itemDescWrap}</div>${itemPriceHTML}</div>`;
+                }).join('');
+                
+                const isTwoCols = controls.listTwoColumnsCheck.checked;
+                const containerClass = isTwoCols ? 'menu-items-container two-columns' : 'menu-items-container';
+                
+                // В верстке списка мы помещаем addHtml внутрь menu-items-container для корректного участия в колонках
+                return `<div class="menu-list-template"><div class="${containerClass}"><div class="menu-section"><div class="section-header"><div class="resizable-container no-pan" data-key="text-category" style="position:relative;"><div class="section-title" contenteditable="true" data-index="0" data-field="category">${state.excelData[0].category}</div>${handlesHTML}</div>${dateHTML}</div></div>${itemsHTML}${addHtml}</div></div>`;
+            } else {
+                const cells = state.excelData.slice(0, limit).map((item, i) => {
+                    // Картинки по умолчанию выстраиваются по правому-нижнему краю (x: 100, y: 100)
+                    const transform = state.imageTransforms[`grid-${i}`] || { size: 100, x: 100, y: 100 };
+                    let photoHTML = state.gridImages[i] ? `<div class="item-photo" title="переместить" style="background-image:url('${state.gridImages[i]}'); background-size: auto ${transform.size}%; background-position: ${transform.x}% ${transform.y}%;"></div><div class="resize-handle tl" title="масштабировать"></div><div class="resize-handle tr" title="масштабировать"></div><div class="resize-handle bl" title="масштабировать"></div><div class="resize-handle br" title="масштабировать"></div><button class="delete-photo-btn" data-index="${i}" title="удалить картинку"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>` : (!state.isExporting && state.currentTab !== 'combined' ? `<button class="upload-photo-btn" title="добавить изображение"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>` : '');
+                    
+                    const itemNameWrap = `<div class="resizable-container no-pan" data-key="text-name" style="position:relative; width:fit-content; max-width:100%;"><div class="item-name" contenteditable="true" data-index="${i}" data-field="name">${item.name}</div>${handlesHTML}</div>`;
+                    const itemDescWrap = controls.showDescCheck.checked ? `<div class="resizable-container no-pan" data-key="text-desc" style="position:relative; width:fit-content; max-width:100%;"><div class="item-description" contenteditable="true" data-index="${i}" data-field="description">${item.description}</div>${handlesHTML}</div>` : '';
+                    
+                    let itemPriceHTML = '';
+                    if (controls.showSmlPricesCheck.checked) {
+                        itemPriceHTML = `<div class="resizable-container no-pan" data-key="text-price" style="position:relative; width:100%; margin-top: auto;">
+                            <div class="volume-price-container">
+                                <div class="volume-price"><span contenteditable="true" data-index="${i}" data-field="volumeS">${item.volumeS}</span> <span contenteditable="true" data-index="${i}" data-field="S">${formatPrice(item.S)}</span> <span>${state.currency}</span></div>
+                                <div class="volume-price"><span contenteditable="true" data-index="${i}" data-field="volumeM">${item.volumeM}</span> <span contenteditable="true" data-index="${i}" data-field="M">${formatPrice(item.M)}</span> <span>${state.currency}</span></div>
+                                <div class="volume-price"><span contenteditable="true" data-index="${i}" data-field="volumeL">${item.volumeL}</span> <span contenteditable="true" data-index="${i}" data-field="L">${formatPrice(item.L)}</span> <span>${state.currency}</span></div>
+                            </div>
+                            ${handlesHTML}
+                        </div>`;
+                    } else {
+                        itemPriceHTML = `<div class="resizable-container no-pan" data-key="text-price" style="position:relative; width:fit-content; margin-top: auto;">
+                            <div class="item-price"><span contenteditable="true" data-index="${i}" data-field="price">${formatPrice(item.price)}</span> <span>${state.currency}</span></div>
+                            ${handlesHTML}
+                        </div>`;
+                    }
+                        
+                    const gradientOverlayHTML = (gradOpacity > 0) 
+                        ? `<div class="grid-gradient-overlay" style="background-image: linear-gradient(to right, rgba(0,0,0,${gradOpacity}) 0%, rgba(0,0,0,0) 100%);"></div>` 
+                        : '';
+                    
+                    const solidBgHTML = `<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: ${cellBgColor}; z-index: 0; pointer-events: none;"></div>`;
+
+                    return `<div class="grid-cell" data-index="${i}" style="background-color: ${cellBgColor};">${solidBgHTML}<div class="item-photo-container resizable-container" data-index="${i}" data-key="grid-${i}">${photoHTML}</div>${gradientOverlayHTML}<div class="grid-cell-content">${itemNameWrap}${itemDescWrap}${itemPriceHTML}</div></div>`;
+                }).join('');
+                
+                let gridClass = 'menu-grid-template';
+                if (currentLayout === 'grid3x2') gridClass = 'menu-grid-template-3x2';
+                else if (currentLayout === 'grid3x3') gridClass = 'menu-grid-template-3x3';
+                else if (currentLayout === 'grid4x3') gridClass = 'menu-grid-template-4x3';
+
+                return headerHTML + `<div class="${gridClass}">${cells}${addHtml}</div>`;
+            }
+        }
+
+        function renderPromoHTML() {
+             const isCombo = state.currentTab === 'combined';
+             const scale = isCombo ? 0.75 : 1;
+             
+             const discountVal = parseInt(controls.promoDiscountSlider.value);
+             const discountBgColor = controls.discountBgColor.value; 
+             const discountHTML = discountVal > 0 ? `<div class="promo-discount" style="background-color: ${discountBgColor};">-${discountVal}%</div>` : '';
+
+             const dragInd = `<div class="drag-indicator"><svg viewBox="0 0 24 24"><path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"/></svg> перемещение</div>`;
+             
+             // Стандартные хэндлы
+             const handlesHTML = ['tl', 'tr', 'bl', 'br'].map(h => `<div class="resize-handle ${h}" title="масштабировать"></div>`).join('');
+             // Специальные хэндлы ширины для текстовых блоков (для переноса)
+             const textHandlesHTML = handlesHTML + ['mr', 'ml'].map(h => `<div class="resize-handle text-handle ${h}" title="изменить ширину"></div>`).join('');
+             
+             let priceBlock = '';
+             if (controls.promoShowPriceCheck.checked) {
+                 if (controls.promoShowSmlPricesCheck.checked) {
+                     priceBlock = `<div class="promo-price-container resizable-container promo-sml-column" data-key="promo-price" style="${getTransformStyle('promo-price')}; z-index: 60;">${dragInd}
+                         <div class="volume-price"><span contenteditable="true" data-field="promoVolumeS">${state.promoVolumeS}</span> <span contenteditable="true" data-field="promoPriceS">${formatPrice(state.promoPriceS)}</span> <span>${state.currency}</span></div>
+                         <div class="volume-price"><span contenteditable="true" data-field="promoVolumeM">${state.promoVolumeM}</span> <span contenteditable="true" data-field="promoPriceM">${formatPrice(state.promoPriceM)}</span> <span>${state.currency}</span></div>
+                         <div class="volume-price"><span contenteditable="true" data-field="promoVolumeL">${state.promoVolumeL}</span> <span contenteditable="true" data-field="promoPriceL">${formatPrice(state.promoPriceL)}</span> <span>${state.currency}</span></div>
+                         ${discountHTML}
+                         ${handlesHTML}
+                     </div>`;
+                 } else {
+                     priceBlock = `<div class="promo-price-container resizable-container" data-key="promo-price" style="${getTransformStyle('promo-price')}; z-index: 60;">${dragInd}<div class="promo-price"><span contenteditable="true" data-field="promoPrice">${formatPrice(state.promoPrice)}</span> <span>${state.currency}</span></div>${discountHTML}${handlesHTML}</div>`;
+                 }
+             }
+             
+             let iconsHTML = '';
+             const iconFiles = ['vegan', 'glutenfree', 'hot', 'new', 'halal'];
+             iconFiles.forEach((icon, i) => {
+                 if (state.promoIcons && state.promoIcons[icon]) {
+                     const key = `promo-icon-${icon}`;
+                     const transform = state.imageTransforms[key] || { size: 120, x: 0, y: 0 };
+                     const defaultLeft = 50 + (i * 30);
+                     const defaultTop = 50 + (i * 30);
+                     const dispSize = transform.size * scale;
+                     
+                     let iconContent = state.loadedIcons[icon] || `<img src="images/${icon}.svg" style="width:100%;height:100%;object-fit:contain;pointer-events:none;">`;
+
+                     iconsHTML += `
+                     <div class="promo-icon resizable-container" data-key="${key}" style="
+                         position: absolute; 
+                         top: ${defaultTop}px; left: ${defaultLeft}px;
+                         width: ${dispSize}px; height: ${dispSize}px;
+                         transform: translate(${transform.x}px, ${transform.y}px);
+                         z-index: 50;
+                         color: var(--promo-icon-color);
+                     ">
+                         ${dragInd}
+                         <button class="delete-icon-btn" data-icon="${icon}" style="opacity: 0; position: absolute; top: -10px; right: -10px; width: 24px; height: 24px; background: rgba(25,28,31,0.9); border-radius: 50%; color: white; border: none; cursor: pointer; display: flex; justify-content: center; align-items: center; z-index: 100; pointer-events: none; transition: opacity 0.2s;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                         <div class="promo-icon-svg-wrapper" style="width:100%; height:100%; pointer-events:none;">
+                             ${iconContent}
+                         </div>
+                         ${handlesHTML}
+                     </div>`;
+                 }
+             });
+
+             let customImagesHTML = '';
+             if (state.customPromoImages && state.customPromoImages.length > 0) {
+                 state.customPromoImages.forEach((imgObj, i) => {
+                     const key = imgObj.id;
+                     const transform = state.imageTransforms[key] || { size: 150, x: 0, y: 0 };
+                     const defaultLeft = 100 + (i * 20);
+                     const defaultTop = 100 + (i * 20);
+                     const dispSize = transform.size * scale;
+
+                     customImagesHTML += `
+                     <div class="promo-custom-img resizable-container" data-key="${key}" style="
+                         position: absolute; 
+                         top: ${defaultTop}px; left: ${defaultLeft}px;
+                         width: ${dispSize}px; height: auto;
+                         transform: translate(${transform.x}px, ${transform.y}px);
+                         z-index: 49;
+                     ">
+                         ${dragInd}
+                         <img src="${imgObj.url}" style="width:100%; height:auto; display:block; pointer-events:none;">
+                         <button class="delete-photo-btn" data-custom-img-id="${key}" style="opacity: 0; pointer-events: auto; transform: scale(0.6); transform-origin: top right; right: 0; top: 0;"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                         ${handlesHTML}
+                     </div>`;
+                 });
+             }
+
+             return `<div class="promo-content"><div><div class="promo-title resizable-container" data-key="promo-title" style="${getTransformStyle('promo-title')}">${dragInd}<span contenteditable="true" data-field="promoTitle">${state.promoTitle}</span>${textHandlesHTML}</div><div class="promo-text resizable-container" data-key="promo-text" style="${getTransformStyle('promo-text')}">${dragInd}<span contenteditable="true" data-field="promoText">${state.promoText}</span>${textHandlesHTML}</div>${priceBlock}</div><div class="promo-comment resizable-container" data-key="promo-comment" style="${getTransformStyle('promo-comment')}">${dragInd}<span contenteditable="true" data-field="promoComment">${state.promoComment}</span>${textHandlesHTML}</div></div>${iconsHTML}${customImagesHTML}`;
+        }
+
+        function setPromoBackground(element) {
+            if(!element) return;
+            const type = controls.promoBgType.value;
+            const transform = state.imageTransforms['promo'] || { size: 102, x: 50, y: 50 };
+
+            if (type === 'image' && state.promoBgImage) {
+                element.style.backgroundImage = `url(${state.promoBgImage})`;
+                element.style.backgroundColor = 'transparent';
+                element.style.backgroundSize = `auto ${transform.size}%`; // Масштабируется по высоте
+            } else {
+                element.style.backgroundColor = controls.bgColorPicker.value;
+                element.style.backgroundImage = 'none';
+            }
+            
+            element.style.backgroundPosition = `${transform.x}% ${transform.y}%`;
+
+            element.classList.add('resizable-container');
+            element.dataset.key = 'promo';
+            element.title = 'переместить'; 
+            if (!element.querySelector('.bg-handle')) {
+                const handles = ['tl', 'tr', 'bl', 'br'].map(h => `<div class="resize-handle bg-handle ${h}" title="масштабировать"></div>`).join('');
+                element.insertAdjacentHTML('beforeend', handles);
+            }
+        }
+
+        function render() {
+            for (const [key, value] of Object.entries(getStyles())) document.documentElement.style.setProperty(key, value);
+            
+            controls.promoDiscountValue.textContent = controls.promoDiscountSlider.value + '%';
+            
+            let html = '';
+            if (state.currentTab === 'menu') html = renderMenuHTML(state.layout);
+            else if (state.currentTab === 'promo') html = `<div class="promo-template" data-key="promo">${renderPromoHTML()}</div>`;
+            else html = `<div class="combined-template"><div class="combined-menu-part">${renderMenuHTML(state.layout)}</div><div class="combined-promo-part" data-key="promo">${renderPromoHTML()}</div></div>`;
+            
+            controls.menuPreview.innerHTML = html;
+            
+            const isMenuColor = controls.menuBgTypeSelect.value === 'color';
+            const menuBgTarget = state.currentTab === 'combined' ? controls.menuPreview.querySelector('.combined-menu-part') : controls.menuPreview;
+            if (menuBgTarget && (state.currentTab === 'menu' || state.currentTab === 'combined')) {
+                const transform = state.imageTransforms['menu-bg'] || { size: 100, x: 50, y: 50 };
+                
+                if (!isMenuColor && state.menuBgImage) {
+                    menuBgTarget.style.backgroundImage = `url(${state.menuBgImage})`;
+                    menuBgTarget.style.backgroundColor = 'transparent';
+                    menuBgTarget.style.backgroundSize = `auto ${transform.size}%`; // Масштабируется по высоте
+                } else {
+                    menuBgTarget.style.backgroundImage = 'none';
+                    menuBgTarget.style.backgroundColor = controls.menuBgPicker.value;
+                }
+                
+                menuBgTarget.style.backgroundPosition = `${transform.x}% ${transform.y}%`;
+
+                menuBgTarget.classList.add('resizable-container');
+                menuBgTarget.dataset.key = 'menu-bg';
+                if (!menuBgTarget.querySelector('.bg-handle')) {
+                    const handles = ['tl', 'tr', 'bl', 'br'].map(h => `<div class="resize-handle bg-handle ${h}" title="масштабировать"></div>`).join('');
+                    menuBgTarget.insertAdjacentHTML('beforeend', handles);
+                }
+            }
+            
+            if (state.currentTab === 'promo' || state.currentTab === 'combined') {
+                setPromoBackground(document.querySelector('.promo-template, .combined-promo-part'));
+            }
+
+            // Выравниваем столбцы по Y и проверяем переполнение
+            if (state.layout === 'list') {
+                setTimeout(() => {
+                    alignListColumns();
+                    checkListOverflow();
+                }, 50);
+            } else {
+                hideWarning();
+            }
+        }
+
+        function download(callback) {
+            deselectActiveResizable();
+            state.isExporting = true; render(); 
+            controls.loadingText.textContent = 'Подготовка к сохранению...';
+            controls.loadingOverlay.style.display = 'flex';
+            
+            const originalPreview = getEl('menu-preview');
+            const captureClone = originalPreview.cloneNode(true);
+            
+            captureClone.querySelectorAll('.upload-photo-btn, .resize-handle, .delete-photo-btn, .delete-item-canvas-btn, .delete-icon-btn, .artboard-add-item, .drag-indicator').forEach(el => el.style.display = 'none');
+            captureClone.querySelectorAll('.selected').forEach(s => s.classList.remove('selected'));
+            
+            // Если включен 2-колоночный список, убедимся что подсветки убраны
+            captureClone.querySelectorAll('.overflow-highlight').forEach(el => el.classList.remove('overflow-highlight'));
+            
+            const captureContainer = document.createElement('div');
+            captureContainer.style.position = 'absolute';
+            captureContainer.style.left = '-9999px';
+            captureContainer.style.top = '0px';
+            captureContainer.style.width = state.exportWidth + 'px';
+            captureContainer.style.height = state.exportHeight + 'px';
+            captureContainer.style.overflow = 'hidden';
+            
+            if (state.aspectRatio === '9/16') {
+                captureContainer.classList.add('is-vertical', 'preview-container');
+            } else {
+                captureContainer.classList.add('preview-container');
+            }
+            captureContainer.style.transform = 'none';
+
+            captureClone.style.width = '100%';
+            captureClone.style.height = '100%';
+            captureContainer.appendChild(captureClone);
+            
+            for (const [key, value] of Object.entries(getStyles())) {
+                captureContainer.style.setProperty(key, value);
+            }
+            
+            document.body.appendChild(captureContainer);
+
+            setTimeout(() => {
+                html2canvas(captureContainer, { scale: 1, width: state.exportWidth, height: state.exportHeight, useCORS: true, backgroundColor: null }).then(canvas => {
+                    callback(canvas);
+                }).finally(() => {
+                    document.body.removeChild(captureContainer);
+                    state.isExporting = false;
+                    render();
+                });
+            }, 500);
+        }
+
+        function downloadAsPNG() { download(canvas => canvas.toBlob(b => { saveAs(b, `${generateFilename()}.png`); controls.loadingOverlay.style.display = 'none'; })); }
+        function downloadAsMP4() {
+            download(canvas => {
+                controls.mp4Modal.style.display = 'none';
+                controls.loadingText.textContent = 'Сохраняем видео...';
+                
+                const videoCanvas = document.createElement('canvas');
+                videoCanvas.width = canvas.width;
+                videoCanvas.height = canvas.height;
+                const ctx = videoCanvas.getContext('2d');
+                
+                const stream = videoCanvas.captureStream(30);
+                const mimeTypes = [
+                    'video/mp4; codecs="avc1.424028, mp4a.40.2"',
+                    'video/mp4; codecs="avc1.42E01E, mp4a.40.2"',
+                    'video/mp4', 'video/webm;codecs=h264', 'video/webm;codecs=vp9', 'video/webm'
+                ];
+                const mimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+                if (!mimeType) { 
+                    alert('Ваш браузер не поддерживает запись видео.'); controls.loadingOverlay.style.display = 'none'; return;
+                }
+                
+                const recorder = new MediaRecorder(stream, { mimeType }); 
+                const chunks = [];
+                recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+                recorder.onstop = () => { saveAs(new Blob(chunks, { type: mimeType }), `${generateFilename()}.mp4`); controls.loadingOverlay.style.display = 'none'; };
+                recorder.start();
+                
+                let start = null;
+                const duration = parseInt(controls.mp4Duration.value, 10) * 1000;
+                
+                const animate = t => {
+                    if(!start) start = t;
+                    ctx.drawImage(canvas, 0, 0);
+                    if(t - start < duration) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        recorder.stop();
+                    }
+                };
+                requestAnimationFrame(animate);
+            });
+        }
+
+        function deselectActiveResizable() {
+            const selected = controls.menuPreview.querySelectorAll('.selected');
+            selected.forEach(el => el.classList.remove('selected'));
+            activeResizable.element = null;
+        }
+
+        function handlePreviewMouseDown(e) { 
+            const isUploadBtn = e.target.closest('.upload-photo-btn');
+            const photoContainerCheck = e.target.closest('.item-photo-container');
+            const hasPhotoCheck = photoContainerCheck ? photoContainerCheck.querySelector('.item-photo') : false;
+            
+            if (isUploadBtn || (photoContainerCheck && !hasPhotoCheck)) {
+                return; 
+            }
+
+            const handle = e.target.closest('.resize-handle');
+            const dragIndicator = e.target.closest('.drag-indicator');
+            const container = e.target.closest('.resizable-container');
+            const selectableBlock = e.target.closest('.selectable-item-block');
+
+            if (!container && !selectableBlock) { 
+                deselectActiveResizable(); 
+                return; 
+            }
+
+            if (container) {
+                if (activeResizable.element !== container) {
+                    deselectActiveResizable();
+                    container.classList.add('selected');
+                }
+            } else if (selectableBlock) {
+                if (activeResizable.element !== selectableBlock) {
+                    deselectActiveResizable();
+                    selectableBlock.classList.add('selected');
+                }
+            }
+            
+            const isContentEditable = e.target.closest('[contenteditable="true"]');
+            if (isContentEditable && !handle && !dragIndicator) {
+                return; 
+            }
+
+            e.preventDefault(); e.stopPropagation();
+            let activeEl = container || selectableBlock;
+            const key = activeEl.dataset.key || ('item-block-' + activeEl.dataset.index);
+            const isTextElement = key.startsWith('text-') || key.startsWith('promo-title') || key.startsWith('promo-text') || key.startsWith('promo-comment') || key.startsWith('promo-price');
+
+            if (!state.imageTransforms[key]) {
+                if (key.startsWith('promo-icon-')) state.imageTransforms[key] = { size: 120, x: 0, y: 0 };
+                else if (key.startsWith('promo-custom-')) state.imageTransforms[key] = { size: 150, x: 0, y: 0 };
+                else if (isTextElement) state.imageTransforms[key] = { x: 0, y: 0, width: null }; 
+                else if (key === 'promo') state.imageTransforms[key] = { size: 102, x: 50, y: 50 };
+                else if (key === 'menu-bg') state.imageTransforms[key] = { size: 100, x: 50, y: 50 };
+                else state.imageTransforms[key] = { size: 100, x: 100, y: 100 }; // 100, 100: позиция картинки по умолчанию правый нижний край
+            }
+            
+            let startSize = state.imageTransforms[key].size || 100;
+            if (isTextElement) {
+                const inputId = mapKeyToFontInput(key);
+                if (inputId) {
+                    startSize = parseInt(document.getElementById(inputId).value) || 20;
+                }
+            }
+
+            activeResizable = {
+                element: activeEl, key: key, isText: isTextElement,
+                startX: e.clientX, startY: e.clientY,
+                startSize: startSize, 
+                startPosX: state.imageTransforms[key].x || 0, 
+                startPosY: state.imageTransforms[key].y || 0,
+                startWidth: activeEl.offsetWidth
+            };
+
+            if (handle) {
+                activeResizable.mode = 'resize';
+                if (handle.classList.contains('br')) activeResizable.handle = 'br';
+                else if (handle.classList.contains('bl')) activeResizable.handle = 'bl';
+                else if (handle.classList.contains('tr')) activeResizable.handle = 'tr';
+                else if (handle.classList.contains('tl')) activeResizable.handle = 'tl';
+                else if (handle.classList.contains('mr')) activeResizable.handle = 'mr';
+                else if (handle.classList.contains('ml')) activeResizable.handle = 'ml';
+            } else if (dragIndicator || key.startsWith('promo-')) {
+                activeResizable.mode = 'translate';
+            } else if (activeEl.classList.contains('selectable-item-block')) {
+                activeResizable.mode = 'none'; // Элемент просто выделен для удаления, без перетаскивания фона
+            } else {
+                activeResizable.mode = 'pan'; 
+            }
+        }
+        
+        function handleDocumentMouseMove(e) {
+            if (!activeResizable.element || activeResizable.mode === 'none') return;
+            e.preventDefault(); e.stopPropagation();
+
+            const zoom = state.currentZoom || 1;
+            const dx = (e.clientX - activeResizable.startX) / zoom;
+            const dy = (e.clientY - activeResizable.startY) / zoom;
+            
+            const transform = state.imageTransforms[activeResizable.key];
+            const isPromoIcon = activeResizable.key.startsWith('promo-icon-');
+            const isPromoCustomImg = activeResizable.key.startsWith('promo-custom-');
+            const isBg = activeResizable.key === 'promo' || activeResizable.key === 'menu-bg';
+            const isText = activeResizable.isText;
+            
+            const isCombo = state.currentTab === 'combined';
+            const comboScale = isCombo ? 0.75 : 1;
+            
+            const elementToStyle = activeResizable.element.matches('.item-photo-container') 
+                ? activeResizable.element.querySelector('.item-photo') 
+                : activeResizable.element;
+
+            if (activeResizable.mode === 'resize') {
+                
+                // Специальные боковые хэндлы для управления шириной текста (переносы)
+                if (activeResizable.handle === 'mr' || activeResizable.handle === 'ml') {
+                    if (activeResizable.handle === 'mr') {
+                        const newScaledWidth = Math.max(50 * comboScale, activeResizable.startWidth + dx);
+                        transform.width = newScaledWidth / comboScale;
+                        activeResizable.element.style.width = `${newScaledWidth}px`;
+                    } else if (activeResizable.handle === 'ml') {
+                        const newScaledWidth = Math.max(50 * comboScale, activeResizable.startWidth - dx);
+                        transform.width = newScaledWidth / comboScale;
+                        transform.x = activeResizable.startPosX + dx;
+                        activeResizable.element.style.width = `${newScaledWidth}px`;
+                        activeResizable.element.style.transform = `translate(${transform.x}px, ${transform.y}px)`;
+                    }
+                    activeResizable.element.style.whiteSpace = 'normal'; // Гарантируем перенос строк
+                    return;
+                }
+
+                let sizeChange = 0;
+                const sensitivity = isText ? 0.2 : 0.4;
+                switch (activeResizable.handle) {
+                    case 'br': sizeChange = (dx + dy) * sensitivity; break;
+                    case 'bl': sizeChange = (dy - dx) * sensitivity; break;
+                    case 'tr': sizeChange = (dx - dy) * sensitivity; break;
+                    case 'tl': sizeChange = (-dx - dy) * sensitivity; break;
+                }
+
+                if (isText) {
+                    const newSize = Math.max(10, Math.min(500, activeResizable.startSize + sizeChange));
+                    const inputId = mapKeyToFontInput(activeResizable.key);
+                    if (inputId) {
+                        document.getElementById(inputId).value = Math.round(newSize);
+                        for (const [k, v] of Object.entries(getStyles())) {
+                            document.documentElement.style.setProperty(k, v);
+                        }
+                    }
+                } else {
+                    const newSize = Math.max(10, Math.min(1000, activeResizable.startSize + sizeChange));
+                    transform.size = newSize;
+
+                    if (elementToStyle) {
+                        if (activeResizable.element.matches('.item-photo-container')) {
+                            elementToStyle.style.backgroundSize = `auto ${newSize}%`;
+                        } else if (isPromoIcon || isPromoCustomImg) {
+                            activeResizable.element.style.width = `${newSize * comboScale}px`;
+                            if (isPromoIcon) activeResizable.element.style.height = `${newSize * comboScale}px`;
+                        } else if (isBg) {
+                            if ((activeResizable.key === 'promo' && controls.promoBgType.value === 'image') || 
+                                (activeResizable.key === 'menu-bg' && controls.menuBgTypeSelect.value === 'image')) {
+                                elementToStyle.style.backgroundSize = `auto ${newSize}%`; // Комбо промо и Меню фон высота
+                            } else {
+                                elementToStyle.style.backgroundSize = `${newSize}%`;
+                            }
+                        } else {
+                            elementToStyle.style.backgroundSize = `${newSize}%`;
+                        }
+                    }
+                }
+            } else if (activeResizable.mode === 'translate') {
+                if (activeResizable.element.classList.contains('no-pan')) return;
+
+                let newX = activeResizable.startPosX + dx;
+                let newY = activeResizable.startPosY + dy;
+                transform.x = newX; transform.y = newY;
+                activeResizable.element.style.transform = `translate(${newX}px, ${newY}px)`;
+            } else if (activeResizable.mode === 'pan') {
+                if (activeResizable.element.classList.contains('no-pan')) return;
+
+                const sensitivity = 50 / activeResizable.element.offsetHeight;
+                let newX = activeResizable.startPosX - (dx * sensitivity);
+                let newY = activeResizable.startPosY - (dy * sensitivity);
+                transform.x = newX; transform.y = newY;
+                
+                if (elementToStyle && !isPromoIcon && !isPromoCustomImg && !isText) {
+                    elementToStyle.style.backgroundPosition = `${newX}% ${newY}%`;
+                }
+            }
+        }
+        
+        function handleDocumentMouseUp(e) { 
+            if (!activeResizable.element) return;
+            e.preventDefault(); e.stopPropagation();
+            activeResizable.mode = null; activeResizable.handle = null;
+        }
+
+        init();
+    });
+</script>
+</body>
+</html>
