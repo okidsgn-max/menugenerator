@@ -2764,6 +2764,34 @@
 
         init();
     });
+    // ==================== UTM-отслеживание для кнопок экспорта ====================
+(function() {
+    const pngExportBtn = document.getElementById("download-png-btn");
+    const mp4ExportBtn = document.getElementById("download-mp4-btn");
+
+    function notifyParent(buttonId) {
+        console.log(buttonId);
+
+        if (window.parent !== window) {
+            window.parent.postMessage(
+                {
+                    type: "menuBoardButtonClick",
+                    buttonId: buttonId,
+                    timestamp: Date.now(),
+                },
+                "*"
+            );
+        }
+    }
+
+    if (pngExportBtn) {
+        pngExportBtn.addEventListener("click", () => notifyParent("download-png-btn"));
+    }
+    if (mp4ExportBtn) {
+        mp4ExportBtn.addEventListener("click", () => notifyParent("download-mp4-btn"));
+    }
+})();
+// ==================== Конец UTM-отслеживания ====================
 </script>
 </body>
 </html>
