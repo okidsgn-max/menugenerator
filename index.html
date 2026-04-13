@@ -2764,15 +2764,16 @@
 
         init();
     });
-    // ==================== UTM-отслеживание для кнопок экспорта ====================
+// ==================== UTM-отслеживание для кнопок экспорта (с логами) ====================
 (function() {
     const pngExportBtn = document.getElementById("download-png-btn");
     const mp4ExportBtn = document.getElementById("download-mp4-btn");
 
     function notifyParent(buttonId) {
-        console.log(buttonId);
+        console.log("[iframe] notifyParent ->", buttonId);
 
         if (window.parent !== window) {
+            console.log("[iframe] postMessage отправляю", buttonId);
             window.parent.postMessage(
                 {
                     type: "menuBoardButtonClick",
@@ -2781,14 +2782,27 @@
                 },
                 "*"
             );
+        } else {
+            console.warn("[iframe] Не в iframe, отправка невозможна");
         }
     }
 
     if (pngExportBtn) {
-        pngExportBtn.addEventListener("click", () => notifyParent("download-png-btn"));
+        pngExportBtn.addEventListener("click", () => {
+            console.log("[iframe] Клик PNG");
+            notifyParent("download-png-btn");
+        });
+    } else {
+        console.warn("[iframe] Кнопка PNG не найдена");
     }
+
     if (mp4ExportBtn) {
-        mp4ExportBtn.addEventListener("click", () => notifyParent("download-mp4-btn"));
+        mp4ExportBtn.addEventListener("click", () => {
+            console.log("[iframe] Клик MP4");
+            notifyParent("download-mp4-btn");
+        });
+    } else {
+        console.warn("[iframe] Кнопка MP4 не найдена");
     }
 })();
 // ==================== Конец UTM-отслеживания ====================
